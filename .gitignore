@@ -36,6 +36,13 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Agent Manager / Kilo tooling - can hold multiple full copies of node_modules
+.kilo/
+.claude/
+
 # generated native folders
 /ios
 /android
+
+# local notes
+PROGRESS.md

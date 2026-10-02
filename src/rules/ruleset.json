@@ -1,0 +1,355 @@
+{
+  "rulesetVersion": "2.1.0",
+  "rules": [
+    {
+      "id": "allergen:milk",
+      "match": [
+        "milk", "milk solids", "skimmed milk powder", "whole milk powder", "milk powder",
+        "casein", "caseinate", "lactose", "whey", "whey powder", "whey protein",
+        "paneer", "ghee", "khoya", "khoa", "malai", "cream", "curd", "dahi",
+        "yogurt", "yoghurt", "butter", "buttermilk", "condensed milk", "evaporated milk",
+        "milk fat", "anhydrous milk solids", "non-fat milk solids", "butter milk",
+        "rabri", "sandesh", "mawa",
+
+        "lait", "creme", "beurre", "lactoserum", "lactalbumine", "babeurre", "fromage", "creme fraiche",
+        "leche", "nata", "mantequilla", "lactosa", "suero de leite", "suero de leche", "queso",
+        "milch", "sahne", "laktose", "molke", "kase", "käse", "buttermilch",
+        "milchpulver", "vollmilchpulver", "magermilchpulver", "lactoserum",
+        "latte", "burro", "panna", "lattosio", "siero di latte", "formaggio",
+        "leite", "manteiga", "creme", "lactose", "soro de leite", "queijo",
+        "melk", "room", "boter", "lactose", "weik", "kaas"
+      ],
+      "exclude": [
+        "peanut butter", "almond butter", "cashew butter", "hazelnut butter",
+        "nut butter", "seed butter", "cocoa butter", "cacao butter", "apple butter",
+        "shea butter", "cocoa", "cacao", "butter bean", "butter beans", "vegan butter",
+        "coconut cream", "vegetable cream", "non dairy cream", "dairy free cream",
+        "vegan cream", "plant cream", "coconut oil cream", "cream of tartar",
+        "bean curd", "fruit curd", "coconut milk", "oat milk", "soy milk", "almond milk",
+        "crema de cacahuate", "pasta de mani", "burro di mani", "burro d'arachidi"
+      ],
+      "severity": "unsafe",
+      "label": "Milk",
+      "reason": "FSSAI requires milk to be declared; this is a common allergen affecting lactose intolerant and milk-allergic individuals.",
+      "category": "allergen"
+    },
+    {
+      "id": "allergen:mustard",
+      "match": ["mustard", "mustard seed", "mustard seeds", "sarson", "rai", "mustard oil", "sarson ka tel", "moutarde", "graines de moutarde", "huile de moutarde", "mostaza", "semillas de mostaza", "aceite de mostaza", "senf", "senfsamen", "senfoel", "senape", "mostarda", "seme di senape", "mosterd", "mosterdsaad"],
+      "severity": "unsafe",
+      "label": "Mustard",
+      "reason": "FSSAI requires mustard to be declared; it is a common allergen in Indian cuisine.",
+      "category": "allergen"
+    },
+    {
+      "id": "allergen:peanut",
+      "match": ["peanut", "peanuts", "groundnut", "groundnuts", "peanut oil", "groundnut oil", "arachis oil", "arachis hypogaea", "peanut butter", "arachide", "arachides", "cacahuete", "cacahuetes", "cacahuate", "erdnuss", "erdnusse", "erdnussol", "arachidi", "amendoim", "amendoins", "pinda"],
+      "severity": "unsafe",
+      "label": "Peanut",
+      "reason": "FSSAI requires peanut/groundnut to be declared; it is a severe allergen.",
+      "category": "allergen"
+    },
+    {
+      "id": "allergen:soy",
+      "match": [
+        "soy", "soya", "soyabean", "soybean", "soybeans", "soya bean", "soya beans",
+        "soy bean", "soy beans", "soy protein", "soy protein isolate", "tofu", "tempeh",
+        "soy lecithin", "soya lecithin", "lecithin soya", "lecithin soy",
+        "textured soy protein", "textured vegetable protein", "soy nuggets", "edamame",
+
+        "soja", "lecitina de soja", "lecithine de soja", "protelines de soja",
+        "soja", "lecitina de soja", "protein de soja", "soia", "soiaost", "proteina di soia",
+        "sojabohne", "sojabohnen", "sojalecithin", "soja oel", "sojaol",
+        "proteine de soja", "farine de soja", "sojamehl",
+        "soja", "lecitina de soja", "protein de soja"
+      ],
+      "exclude": [
+        "sunflower lecithin", "lecithin sunflower", "rapeseed lecithin",
+        "lecithin rapeseed", "canola lecithin", "non soy lecithin"
+      ],
+      "severity": "unsafe",
+      "label": "Soy",
+      "reason": "FSSAI requires soy to be declared; it is a common allergen. Lecithin is only counted when the source is declared as soy or soya, because sunflower and rapeseed lecithin are also common and are not soy.",
+      "category": "allergen"
+    },
+    {
+      "id": "allergen:wheat",
+      "match": [
+        "wheat", "wheat flour", "maida", "atta", "whole wheat", "gluten",
+        "bread flour", "cake flour", "semolina", "sooji", "rava", "durum wheat",
+        "barley", "malt", "malt extract", "brewer's yeast", "seitan", "farina",
+
+        "ble", "farine de ble", "froment", "gluten", "semoule",
+        "trigo", "harina de trigo", "triticale",
+        "weizen", "weizenmehl", "mehl", "weizenstarke",
+        "grano", "grano tenero", "frumento", "glutine", "semola di grano duro",
+        "trigo", "farinha de trigo", "gluten",
+        "tarwe", "tarwemeel", "tarwezetmeel", "rogge", "gerst"
+      ],
+      "exclude": [
+        "gluten free", "gluten-free", "glutenfree", "no gluten", "without gluten",
+        "certified gluten free", "certificated gluten free", "sorghum", "millet",
+        "rice flour", "rice starch", "buckwheat flour"
+      ],
+      "severity": "unsafe",
+      "label": "Wheat/gluten",
+      "reason": "FSSAI requires wheat to be declared; gluten affects celiac and gluten-sensitive individuals. Note: ragi, bajra and jowar are gluten-free millets. An ingredient described as 'gluten-free' is not a wheat source.",
+      "category": "allergen"
+    },
+    {
+      "id": "allergen:tree_nuts",
+      "match": [
+        "nut", "nuts", "tree nut", "tree nuts", "mixed nuts", "nut kernel",
+        "almond", "almonds", "cashew", "cashews", "kaju", "walnut", "walnuts",
+        "pecan", "pecans", "pistachio", "pistachios", "hazelnut", "hazelnuts",
+        "brazil nut", "brazil nuts", "pine nut", "pine nuts", "macadamia",
+        "macadamias", "chestnut", "chestnuts", "badam",
+
+        "noisette", "noisettes", "noixette", "amande", "amandes", "noix de cajou",
+        "noix de pecan", "noix de pcan", "pistache", "pistaches", "fruits a coque",
+        "avellana", "avellanas", "almendra", "almendras", "nueces", "nuez de caju",
+        "anacardo", "anacardos", "pistacho", "pistachos", "frutos secos",
+        "haselnuss", "haselnusse", "mandel", "mandeln", "walnuss", "walnusse",
+        "cashew", "pistazie", "macadamia nuss",
+        "nocciole", "mandorle", "noci", "anacardi", "pistacchi", "frutta a guscio",
+        "avelã", "avelãs", "amêndoa", "amêndoas", "nozes", "castanha", "pistácio",
+        "hazelnoot", "hazelnoten", "amandel", "walnoot", "cashewnoten"
+      ],
+      "exclude": [
+        "water chestnut", "peanut", "peanuts", "groundnut", "groundnuts", "coconut",
+        "cocoa", "cacao", "noix de coco", "coco", "nuez moscada", "noix de muscade",
+        "cacao beans", "cacahuate", "cachou"
+      ],
+      "severity": "unsafe",
+      "label": "Tree nuts",
+      "reason": "FSSAI requires tree nuts to be declared; they are severe allergens. A generic \"may contain: nuts\" statement is treated as tree nuts, since peanuts are declared separately.",
+      "category": "allergen"
+    },
+    {
+      "id": "allergen:egg",
+      "match": [
+        "egg", "eggs", "egg white", "egg whites", "egg yolk", "albumen", "albumin",
+        "egg albumin", "egg powder", "ovalbumin", "ovomucin", "mayonnaise", "egg wash",
+
+        "oeuf", "oeufs", "blanc d'oeuf", "jaune d'oeuf", "albumine d'oeuf", "mayonnaise",
+        "huevo", "huevos", "clara de huevo", "yema de huevo", "ovoalb umina", "mayonesa",
+        "ei", "eier", "eigelb", "eiweiss", "huhnerei",
+        "uovo", "uova", "tuorlo", "albume", "rossa d'uovo",
+        "ovo", "ovos", "clara de ovo", "gema de ovo", "maionese",
+        "ei", "eieren", "eiwit", "dooier"
+      ],
+      "exclude": ["egg substitute", "egg replacer", "vegan egg"],
+      "severity": "unsafe",
+      "label": "Egg",
+      "reason": "FSSAI requires egg to be declared; it is a common allergen.",
+      "category": "allergen"
+    },
+    {
+      "id": "allergen:fish",
+      "match": [
+        "fish", "fish sauce", "fish paste", "anchovy", "anchovies", "surimi", "fish oil",
+        "salmon", "tuna", "cod", "haddock", "tilapia", "bonito",
+
+        "poisson", "thon", "saumon", "cabillaud", "anchois", "sardine", "colin",
+        "pescado", "atun", "salmon", "bacalao", "anchoa", "sardina", "caballa",
+        "fisch", "lachs", "thunfisch", "seelachs", "sardine", "fischsauce",
+        "pesce", "tonno", "salmone", "merluzzo", "acciuga", "sardina",
+        "peixe", "atum", "salmao", "bacalhau", "atum",
+        "vis", "zalm", "tuna", "kabeljauw", "haring"
+      ],
+      "severity": "unsafe",
+      "label": "Fish",
+      "reason": "FSSAI requires fish to be declared; it is a common allergen.",
+      "category": "allergen"
+    },
+    {
+      "id": "allergen:crustacean",
+      "match": [
+        "crustacean", "crustaceans", "prawn", "prawns", "shrimp", "shrimps",
+        "crab", "lobster", "lobsters", "crab meat", "shellfish",
+        "mussel", "mussels", "clam", "clams", "scallop", "oyster", "oysters",
+        "crayfish", "crawfish", "langoustine", "cuttlefish",
+
+        "crustace", "crustaces", "crevette", "crevettes", "homard", "ecrevisse",
+        "crustaceo", "crustaceos", "gamba", "gambas", "camaron", "camarones", "langostino",
+        "krebs", "krebstiere", "garnele", "garnelen", "krabbe", "hummer",
+        "crostaceo", "crostacei", "gambero", "gamberi", "aragosta", "granchio",
+        "crustaceo", "camarão", "camarao", "caranguejo", "lagosta",
+        "schaaldier", "garnaal", "garnalen", "krab"
+      ],
+      "severity": "unsafe",
+      "label": "Crustacean/shellfish",
+      "reason": "FSSAI requires crustaceans to be declared; they are severe allergens.",
+      "category": "allergen"
+    },
+    {
+      "id": "allergen:sesame",
+      "match": ["sesame", "sesame seed", "sesame seeds", "sesame oil", "sesame paste", "tahini", "halva", "til", "til seed", "gingelly", "gingelly oil", "sesame", "graines de sesame", "pate de sesame", "huile de sesame", "sesamo", "aceite de sesamo", "pasta de sesamo", "sesam", "sesampaste", "sesamo", "oleo de sesamo", "gergelim", "pasta de gergelim", "sesamolie"],
+      "severity": "unsafe",
+      "label": "Sesame",
+      "reason": "FSSAI requires sesame to be declared; it is a common allergen in Indian cuisine.",
+      "category": "allergen"
+    },
+    {
+      "id": "additive:aspartame",
+      "match": ["aspartame", "e951"],
+      "severity": "unsafe",
+      "label": "Aspartame",
+      "reason": "FSSAI requires a 'Contains Phenylalanine' warning for aspartame (PKU risk). E951 is aspartame.",
+      "category": "additive"
+    },
+    {
+      "id": "additive:saccharin",
+      "match": ["saccharin", "e950"],
+      "severity": "unsafe",
+      "label": "Saccharin",
+      "reason": "Saccharin is a restricted artificial sweetener under FSSAI. E950 is saccharin.",
+      "category": "additive"
+    },
+    {
+      "id": "additive:cyclamate",
+      "match": ["cyclamate", "cyclamates", "e952", "calcium cyclamate", "sodium cyclamate"],
+      "severity": "unsafe",
+      "label": "Cyclamate",
+      "reason": "Cyclamates are prohibited sweeteners in India and many countries. E952 is cyclamate.",
+      "category": "additive"
+    },
+    {
+      "id": "additive:phenylalanine",
+      "match": ["phenylalanine", "pku warning", "pkd warning", "contains phenylalanine"],
+      "severity": "unsafe",
+      "label": "Phenylalanine",
+      "reason": "FSSAI and PKU guidelines require a phenylalanine warning for aspartame-containing products.",
+      "category": "additive"
+    },
+    {
+      "id": "additive:caramel_colour",
+      "match": ["caramel colour", "caramel color", "e150", "e150a", "e150b", "e150c", "e150d"],
+      "severity": "unsafe",
+      "label": "Caramel colour",
+      "reason": "Caramel colour (E150d) may contain 4-MeI, a possible carcinogen.",
+      "category": "additive"
+    },
+    {
+      "id": "additive:tartrazine",
+      "match": ["tartrazine", "yellow 5", "fd&c yellow no 5", "e102"],
+      "severity": "unsafe",
+      "label": "Tartrazine",
+      "reason": "Tartrazine (E102) is an artificial colour linked to hyperactivity and allergic reactions.",
+      "category": "additive"
+    },
+    {
+      "id": "additive:sunset_yellow",
+      "match": ["sunset yellow", "sunset yellow fcf", "yellow 6", "fd&c yellow no 6", "e110"],
+      "severity": "unsafe",
+      "label": "Sunset yellow",
+      "reason": "Sunset Yellow FCF (E110) is a restricted artificial colour.",
+      "category": "additive"
+    },
+    {
+      "id": "additive:allura_red",
+      "match": ["allura red", "allura red ac", "e129"],
+      "severity": "unsafe",
+      "label": "Allura red",
+      "reason": "Allura Red AC (E129) is a restricted artificial colour.",
+      "category": "additive"
+    },
+    {
+      "id": "additive:bha",
+      "match": ["bha", "butylated hydroxyanisole", "e320"],
+      "severity": "unsafe",
+      "label": "BHA",
+      "reason": "BHA (E320) is an antioxidant restricted preservative with health concerns.",
+      "category": "additive"
+    },
+    {
+      "id": "additive:bht",
+      "match": ["bht", "butylated hydroxytoluene", "e321"],
+      "severity": "unsafe",
+      "label": "BHT",
+      "reason": "BHT (E321) is an antioxidant restricted preservative with health concerns.",
+      "category": "additive"
+    },
+    {
+      "id": "additive:potassium_bromate",
+      "match": ["potassium bromate", "kbro3", "flour improver"],
+      "severity": "unsafe",
+      "label": "Potassium bromate",
+      "reason": "Potassium bromate is a flour improver banned in the EU and several countries.",
+      "category": "additive"
+    },
+    {
+      "id": "additive:flavour_enhancers",
+      "match": ["e620", "e621", "e622", "e623", "e624", "e625", "e626", "e627", "e628", "e629", "e630", "e631", "e632", "e633", "e634", "e635"],
+      "severity": "unsafe",
+      "label": "Flavour enhancer (E621-E635)",
+      "reason": "MSG-class flavour enhancers (E621-E635) are regulated additives requiring declaration.",
+      "category": "additive"
+    },
+    {
+      "id": "caution:msg",
+      "match": [
+        "msg", "monosodium glutamate", "vetsin", "flavour enhancer", "flavor enhancer",
+        "hydrolysed vegetable protein", "hvp", "hydrolysed protein", "autolysed yeast",
+        "yeast extract", "nutritional yeast", "natural flavour", "natural flavor",
+        "nature identical flavour", "nature identical flavor"
+      ],
+      "severity": "caution",
+      "label": "MSG or flavour enhancer",
+      "reason": "Commonly unwanted; may cause sensitivity in some individuals.",
+      "category": "substance"
+    },
+    {
+      "id": "caution:palm_oil",
+      "match": ["palm oil", "palmolein", "palm olein", "palm stearin", "red palm oil"],
+      "severity": "caution",
+      "label": "Palm oil",
+      "reason": "Commonly unwanted; environmental and health concerns around saturated fat.",
+      "category": "substance"
+    },
+    {
+      "id": "caution:hydrogenated_oil",
+      "match": ["hydrogenated oil", "partially hydrogenated", "vanaspati", "vegetable ghee", "margarine", "shortening", "trans fat"],
+      "exclude": [
+        "no trans fat", "0 trans fat", "0 g trans fat", "0g trans fat", "0.0 g trans fat",
+        "zero trans fat", "trans fat 0", "trans fat free", "no partially hydrogenated"
+      ],      "severity": "caution",
+      "label": "Hydrogenated oil",
+      "reason": "Commonly unwanted; source of trans fats. A '0 g trans fat' claim is not a flag.",
+      "category": "substance"
+    },
+    {
+      "id": "caution:glucose_syrup",
+      "match": ["glucose syrup", "corn syrup", "high fructose corn syrup", "hfcs", "glucose"],
+      "severity": "caution",
+      "label": "Glucose syrup",
+      "reason": "Commonly unwanted; highly processed sweetener.",
+      "category": "substance"
+    },
+    {
+      "id": "caution:artificial_flavour",
+      "match": ["artificial flavour", "artificial flavor", "artificial essence"],
+      "severity": "caution",
+      "label": "Artificial flavour",
+      "reason": "Commonly unwanted; synthetic flavouring agents.",
+      "category": "substance"
+    },
+    {
+      "id": "caution:artificial_colour",
+      "match": [
+        "artificial colour", "artificial color", "colour", "color", "food colour",
+        "food color", "colour added", "color added", "yellow 4", "yellow 3",
+        "yellow 2", "yellow 7", "yellow 9", "yellow 10", "yellow 11", "yellow 1",
+        "blue 1", "blue 2", "red 40", "red 3", "green 3"
+      ],
+      "exclude": [
+        "natural colour", "natural color", "no artificial", "without artificial",
+        "caramel colour", "caramel color", "beta carotene", "no colour", "no color"
+      ],
+      "severity": "caution",
+      "label": "Artificial colour",
+      "reason": "Commonly unwanted; synthetic colouring agents. A 'no artificial colours' claim is not a flag.",
+      "category": "substance"
+    }
+  ]
+}
