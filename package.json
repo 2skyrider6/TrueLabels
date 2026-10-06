@@ -40,7 +40,10 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "jest"
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "eval:baseline": "jest src/ai/eval/report.test.ts",
+    "rules:coverage": "node scripts/derive-covered-scripts.js"
   },
   "private": true
 }

@@ -1,5 +1,5 @@
 import { CameraView } from 'expo-camera';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -19,8 +19,9 @@ import {
   extractIngredientSection,
   isOcrSupported,
 } from '@/ocr/recognize';
-import { parseIngredients } from '@/rules/parser';
-import { evaluateEngine, loadRuleset } from '@/rules/engine';
+import { loadRuleset } from '@/rules/engine';
+import { analyze } from '@/ai/analyze';
+import { isRulesetReadable } from '@/ai/scripts';
 import { Button, Callout, IconButton } from '@/components/ui';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -40,6 +41,16 @@ export default function LabelScanScreen() {
 
   const cameraViewRef = useRef<any>(null);
   const permissionRequestedRef = useRef(false);
+
+  /**
+   * Whether this text is in a language the rule set cannot read. Worth telling the
+   * user about, because it is why the result will be reported as NOT VERIFIED
+   * rather than as a verdict they should trust.
+   */
+  const wouldBeUnreadable = useMemo(
+    () => (ocrText.trim() ? !isRulesetReadable(ocrText) : false),
+    [ocrText]
+  );
 
   // Ask for camera access exactly once, on mount.
   useEffect(() => {
@@ -117,7 +128,7 @@ export default function LabelScanScreen() {
   }, [runOcr]);
 
   const handleAnalyze = useCallback(
-    async (text: string, fromOcr: boolean = false) => {
+    (text: string, fromOcr: boolean = false) => {
       if (!text.trim()) {
         Alert.alert('No Text', 'Please enter or capture ingredient text.');
         return;
@@ -125,21 +136,25 @@ export default function LabelScanScreen() {
 
       setProcessing(true);
       try {
-        const parsed = parseIngredients(text);
-        const { flags, verdict, insufficientData } = evaluateEngine(parsed, ruleset);
+        // Analysis is on-device and immediate, so there is nothing to await and
+        // nothing to fail: the rule set either reads the label or it does not.
+        const outcome = analyze(text, {
+          ruleset,
+          foundHeader: fromOcr ? ocrFoundHeader : true,
+        });
 
         setResult({
           source: 'label',
           // Kept so the photo is copied out of the cache and shown in history.
           imageUrl: imageUri ?? undefined,
           rawIngredients: text,
-          parsed,
-          flags,
-          verdict,
-          // Guards against presenting an unreadable label as allergen-free. Text
-          // the user typed or pasted is assumed to be a real ingredient list;
-          // OCR text is only trusted if a header was actually located.
-          insufficientData: insufficientData || (fromOcr && !ocrFoundHeader),
+          parsed: outcome.parsed,
+          flags: outcome.result.flags,
+          verdict: outcome.result.verdict,
+          insufficientData: outcome.result.insufficientData,
+          coverage: outcome.coverage,
+          analysisSource: outcome.source,
+          aiProvenance: outcome.provenance,
           // Veg/non-veg marks need a native vision module that is not available
           // yet, so this is always 'unknown' rather than a guess.
           vegMark: 'unknown',
@@ -155,7 +170,7 @@ export default function LabelScanScreen() {
         setProcessing(false);
       }
     },
-    [imageUri, navigation, setResult, ocrFoundHeader]
+    [imageUri, navigation, ocrFoundHeader, setResult]
   );
 
   const retake = useCallback(() => {
@@ -308,8 +323,18 @@ export default function LabelScanScreen() {
                 )}
               </View>
 
+              {/* Worth saying before the user invests in a photo they cannot verify. Nothing
+                  is being sent anywhere, so there is no cheaper fallback to offer. */}
+              {!processing && wouldBeUnreadable && (
+                <Callout tone="warning" icon="alert-circle-outline" title="Language not covered">
+                  This label appears to be written in a language TrueLabels cannot read yet.
+                  You will still get a result, but it will be marked NOT VERIFIED rather than
+                  confirmed. Check the pack for allergens yourself.
+                </Callout>
+              )}
+
               <Button
-                label="Analyse ingredients"
+                label={wouldBeUnreadable ? 'Analyse anyway' : 'Analyse ingredients'}
                 icon="search-outline"
                 onPress={() => handleAnalyze(ocrText, true)}
                 disabled={!ocrText.trim() || processing}

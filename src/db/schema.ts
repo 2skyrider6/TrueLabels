@@ -50,6 +50,33 @@ export const MIGRATIONS: Migration[] = [
       ALTER TABLE scans ADD COLUMN insufficient_data INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    // Coverage and provenance for the on-device rules engine.
+    //
+    // `coverage` gates what the result screen may display: an 'unverified' row must
+    // never be re-rendered as a trusted SAFE verdict when reopened from history.
+    // This is the part that matters for safety, because history is where someone
+    // looks up a product they bought weeks ago.
+    //
+    // It is nullable with an explicit backfill rather than a DEFAULT of
+    // 'verified', because a column default would assert a trust level for every
+    // pre-existing row that was never actually established. The backfill
+    // reproduces exactly what the app did before, which is to trust a verdict
+    // when the label was readable and refuse it when it was not.
+    version: 4,
+    sql: `
+      ALTER TABLE scans ADD COLUMN coverage TEXT;
+      ALTER TABLE scans ADD COLUMN ai_provenance_json TEXT;
+
+      UPDATE scans
+      SET coverage = CASE WHEN insufficient_data = 1 THEN 'unverified' ELSE 'verified' END;
+
+      CREATE TABLE IF NOT EXISTS app_meta (
+        key TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL
+      );
+    `,
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, m) => Math.max(max, m.version), 0);
