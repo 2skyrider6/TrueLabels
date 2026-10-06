@@ -1,0 +1,12 @@
+appId: com.truelabels.app
+---
+- launchApp
+- assertVisible: "TrueLabels"
+- tapOn: "Type ingredients"
+- assertVisible: "Type the ingredients"
+- tapOn: "Ingredients text"
+- inputText: "Milk, Sugar, Wheat Flour, Egg, May contain: Nuts, Soy"
+- tapOn: "Analyse ingredients"
+- extendedWaitFor:
+    visible: "Result"
+    timeout: 30000

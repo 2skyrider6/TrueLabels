@@ -1,0 +1,136 @@
+name: Staging pipeline
+
+on:
+  push:
+    branches: [staging]
+
+env:
+  EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
+  SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+  EXPO_APPLE_ID: ${{ secrets.EXPO_APPLE_ID }}
+  EXPO_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+    with:
+      environment: staging
+    permissions:
+      contents: read
+
+  ui-tests:
+    needs: quality
+    name: UI tests (Maestro · Android dev client)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync staging env
+        run: node scripts/sync-env.js staging
+
+      - name: Build Android dev client
+        run: |
+          npx eas-cli build -p android -e development --wait --json > build.json
+          BUILD_ID=$(node scripts/build-id.js < build.json)
+          echo "build id: $BUILD_ID"
+          npx eas-cli build:download --build-id "$BUILD_ID"
+
+      - name: Run Maestro flows on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          script: |
+            APK=$(ls *.apk | head -n 1)
+            adb install "$APK"
+            adb shell pm grant com.truelabels.app android.permission.CAMERA || true
+            curl -Ls "https://get.maestro.mobile.dev" | bash
+            export PATH="$PATH:$HOME/.maestro/bin:$HOME/.local/bin"
+            maestro test tests/e2e/flows
+
+  build:
+    needs: quality
+    name: Build beta (iOS + Android)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync staging env
+        run: node scripts/sync-env.js staging
+
+      - name: Build with EAS (signed, auto-incremented build number)
+        run: npx eas-cli build -p all -e staging --wait --non-interactive
+
+  submit:
+    needs: build
+    name: Distribute beta (TestFlight + Play Internal)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync staging env
+        run: node scripts/sync-env.js staging
+
+      - name: Submit iOS to TestFlight
+        run: >
+          npx eas-cli submit -p ios -e staging --non-interactive
+          --auto-testflight-setup
+          -g "Truelabels Internal"
+          --what-to-test "Staging beta from commit ${{ github.sha }}. Verify scan, OCR and history flows."
+
+      - name: Submit Android to Play Internal
+        run: npx eas-cli submit -p android -e staging --non-interactive
+
+  sentry-release:
+    needs: build
+    name: Create Sentry release (staging)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read app version
+        id: version
+        run: echo "app=$(node -e "console.log(require('./app.json').expo.version)")" >> "$GITHUB_OUTPUT"
+
+      - name: Create Sentry release
+        uses: getsentry/sentry-release@v1
+        with:
+          environment: staging
+          version: ${{ steps.version.outputs.app }}
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}

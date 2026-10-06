@@ -1,7 +1,6 @@
 import { OffProduct, OffApiResponse } from './types';
+import { apiBaseUrl, searchUrl } from '@/config/env';
 
-const BASE_URL = 'https://world.openfoodfacts.org/api/v0';
-const SEARCH_URL = 'https://world.openfoodfacts.org/cgi/search.pl';
 const USER_AGENT = 'TrueLabels/1.0 (contact@truelabels.in)';
 
 const REQUEST_TIMEOUT_MS = 8000;
@@ -216,7 +215,7 @@ async function fetchWithRetry(
 
 async function requestProduct(code: string): Promise<OffProduct | null> {
   // Encoded so an unexpected payload can never alter the request path.
-  const url = `${BASE_URL}/product/${encodeURIComponent(code)}.json?fields=${FIELDS}`;
+  const url = `${apiBaseUrl}/product/${encodeURIComponent(code)}.json?fields=${FIELDS}`;
 
   const response = await fetchWithRetry(url, {
     headers: {
@@ -321,7 +320,7 @@ export async function searchProductsByName(
     fields: 'code,product_name,brands,image_front_url',
   });
 
-  const response = await fetchWithRetry(`${SEARCH_URL}?${params.toString()}`, {
+  const response = await fetchWithRetry(`${searchUrl}?${params.toString()}`, {
     headers: {
       'User-Agent': USER_AGENT,
       Accept: 'application/json',

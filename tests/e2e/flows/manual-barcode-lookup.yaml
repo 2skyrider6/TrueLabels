@@ -1,0 +1,10 @@
+appId: com.truelabels.app
+---
+- launchApp
+- assertVisible: "TrueLabels"
+- tapOn: "Barcode number"
+- inputText: "3017620422003"
+- tapOn: "Look up"
+- extendedWaitFor:
+    visible: "Result"
+    timeout: 30000

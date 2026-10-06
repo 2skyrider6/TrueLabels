@@ -63,7 +63,15 @@
           "backgroundColor": "#E6F4FE"
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "REPLACE_WITH_SENTRY_ORG_SLUG",
+          "project": "REPLACE_WITH_SENTRY_PROJECT_SLUG",
+          "url": "https://sentry.io/"
+        }
+      ]
     ],
     "extra": {
       "eas": {

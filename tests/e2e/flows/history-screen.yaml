@@ -1,0 +1,6 @@
+appId: com.truelabels.app
+---
+- launchApp
+- assertVisible: "TrueLabels"
+- tapOn: "Open scan history"
+- assertVisible: "History"

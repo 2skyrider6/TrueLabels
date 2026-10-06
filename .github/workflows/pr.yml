@@ -1,0 +1,16 @@
+name: PR checks
+
+on:
+  pull_request:
+    branches: [develop, staging, master]
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gate:
+    uses: ./.github/workflows/quality.yml
+    with:
+      environment: development
+    permissions:
+      contents: read
