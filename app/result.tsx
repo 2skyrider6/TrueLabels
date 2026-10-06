@@ -19,7 +19,8 @@ import {
   Chip,
   SectionHeading,
 } from '@/components/ui';
-import { colors, radii, shadows, spacing, toneColors, typography, verdictTone } from '@/theme/tokens';
+import { colors, radii, shadows, spacing, toneColors, typography } from '@/theme/tokens';
+import { presentVerdict } from '@/ai/merge';
 
 /** Icon per verdict, so the outcome is recognisable before the word is read. */
 const VERDICT_ICON = {
@@ -54,20 +55,29 @@ export default function ResultScreen() {
     );
   }
 
-  // An unreadable label must never render as a clean green result, however the
-  // verdict happened to come out.
+  // A verdict is only ever presented as a clean bill of health when the pipeline
+  // can justify it. `presentVerdict` is the single gate for that decision: it
+  // forces NOT READ for an unreadable label and NOT VERIFIED for one written in a
+  // language the offline rule set cannot read, regardless of what the engine
+  // concluded.
+  const coverage = result.coverage ?? 'unverified';
+  const presentation = presentVerdict(result.verdict, coverage, result.insufficientData);
+  const unverified = !presentation.verdictTrusted;
   const unreadable = result.insufficientData;
-  const tone = unreadable ? 'neutral' : verdictTone(result.verdict);
+
+  const tone = presentation.tone;
   const palette = toneColors(tone);
 
-  const verdictTitle = unreadable ? 'NOT READ' : result.verdict.toUpperCase();
+  const verdictTitle = presentation.title;
   const verdictMessage = unreadable
     ? 'No ingredient text could be read from this label'
-    : result.verdict === 'unsafe'
-      ? 'Contains flagged allergens or restricted additives'
-      : result.verdict === 'caution'
-        ? 'Caution items or possible cross-contamination detected'
-        : 'No flagged allergens or restricted additives found';
+    : coverage === 'unverified'
+      ? 'This label is in a language the offline rules cannot read, so no verdict has been confirmed'
+      : result.verdict === 'unsafe'
+        ? 'Contains flagged allergens or restricted additives'
+        : result.verdict === 'caution'
+          ? 'Caution items or possible cross-contamination detected'
+          : 'No flagged allergens or restricted additives found';
 
   const offUrl = result.offUrl || 'https://world.openfoodfacts.org';
   const declared = result.parsed.declaredAllergens;
@@ -89,7 +99,7 @@ export default function ResultScreen() {
         </Text>
         <Text style={styles.heroMessage}>{verdictMessage}</Text>
 
-        {!unreadable && (
+        {!unverified && (
           <View style={styles.heroStats}>
             <View style={styles.heroStat}>
               <Text style={styles.heroStatValue}>{declared.length}</Text>
@@ -153,6 +163,14 @@ export default function ResultScreen() {
             No ingredient text was found, so no verdict can be trusted. Retake the photo with
             the ingredient list filling the frame and in focus, use Paste Ingredients to type
             it in, or check the pack yourself.
+          </Callout>
+        )}
+
+        {coverage === 'unverified' && !unreadable && (
+          <Callout tone="warning" icon="alert-circle" title="No verdict has been confirmed">
+            The rule set in TrueLabels could not read the language of this label. Nothing here
+            has been cleared as safe. Check the pack for allergens yourself, or paste the
+            ingredients as text to analyse them without the camera.
           </Callout>
         )}
 
@@ -418,6 +436,27 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
     textAlign: 'center',
+    marginTop: spacing.xs,
+  },
+  heroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.lg,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  heroBadgeText: {
+    ...typography.captionStrong,
+  },
+  disclosureBody: {
+    ...typography.caption,
+    color: colors.textMuted,
     marginTop: spacing.xs,
   },
   heroStats: {

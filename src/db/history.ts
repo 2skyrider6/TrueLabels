@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 import { MIGRATIONS } from './schema';
 import { ScanResult, Verdict } from '../rules/types';
+import type { AiProvenance, Coverage } from '../ai/types';
 import { deleteAllScanImages, deleteScanImage, persistScanImage } from '../storage/scanImages';
 
 const DB_NAME = 'truelabels.db';
@@ -34,6 +35,16 @@ function getDb(): SQLite.SQLiteDatabase {
   return database;
 }
 
+/**
+ * Shared connection handle.
+ *
+ * Exported so other modules query the same connection. Opening a second handle
+ * to the same WAL database invites lock contention for no benefit.
+ */
+export function getDatabase(): SQLite.SQLiteDatabase {
+  return getDb();
+}
+
 export function initDatabase(): void {
   getDb();
 }
@@ -57,6 +68,9 @@ export interface HistoryScan {
   createdAt: string;
   /** The label could not be read; `verdict` is not trustworthy for this row. */
   insufficientData: boolean;
+  coverage?: Coverage;
+  aiProvenance?: AiProvenance;
+  normalisedIngredients?: string[];
 }
 
 export function saveScan(scan: ScanResult): number {
@@ -67,9 +81,10 @@ export function saveScan(scan: ScanResult): number {
   const result = getDb().runSync(
     `INSERT INTO scans (
        barcode, product_name, brands, image_uri, raw_text, verdict, flags_json,
-may_contain_json, declared_allergens_json, ingredients_json,
-        ruleset_version, off_url, veg_mark, source, created_at, insufficient_data
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       may_contain_json, declared_allergens_json, ingredients_json,
+       ruleset_version, off_url, veg_mark, source, created_at, insufficient_data,
+       coverage, ai_provenance_json
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     scan.barcode || null,
     scan.productName || null,
     scan.brands || null,
@@ -85,7 +100,11 @@ may_contain_json, declared_allergens_json, ingredients_json,
     scan.vegMark,
     scan.source,
     scan.createdAt,
-    scan.insufficientData ? 1 : 0
+    scan.insufficientData ? 1 : 0,
+    // Absent coverage on a pre-v4 row means the backfill could not establish
+    // trust, so it is stored as unverified rather than optimistically verified.
+    scan.coverage ?? 'unverified',
+    scan.aiProvenance ? JSON.stringify(scan.aiProvenance) : null
   );
   return result.lastInsertRowId;
 }
@@ -108,6 +127,20 @@ interface DbScanRow {
   source: string;
   created_at: string;
   insufficient_data: number | null;
+  coverage: string | null;
+  ai_provenance_json: string | null;
+}
+
+const COVERAGE_VALUES = new Set<Coverage>(['verified', 'unverified']);
+
+function parseJson<T>(value: string | null, fallback: T): T {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    // A malformed blob must not break the whole history list.
+    return fallback;
+  }
 }
 
 function mapRowToHistoryScan(row: DbScanRow): HistoryScan {
@@ -129,6 +162,15 @@ function mapRowToHistoryScan(row: DbScanRow): HistoryScan {
     source: (row.source as HistoryScan['source']) || 'manual',
     createdAt: row.created_at,
     insufficientData: row.insufficient_data === 1,
+    // A row written before coverage existed, or one carrying a value this build
+    // does not recognise, is treated as unverified. Defaulting to 'verified'
+    // would re-introduce the exact false SAFE this feature removes.
+    ...(row.coverage && COVERAGE_VALUES.has(row.coverage as Coverage)
+      ? { coverage: row.coverage as Coverage }
+      : { coverage: 'unverified' as Coverage }),
+    ...(row.ai_provenance_json
+      ? { aiProvenance: parseJson<AiProvenance | null>(row.ai_provenance_json, null) ?? undefined }
+      : {}),
   };
 }
 

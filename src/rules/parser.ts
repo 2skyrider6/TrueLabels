@@ -9,7 +9,22 @@ function normalize(text: string): string {
     // removed before punctuation is stripped. Without this a hyphenated E-number
     // normalises to "e 150d" and matches no rule.
     .replace(/\be[\s-]*(?=\d)/g, 'e')
-    .replace(/[^a-z0-9\s]/g, ' ')
+    // Letters, combining marks and digits of any script survive; everything else
+    // becomes a space.
+    //
+    // This used to strip to `[a-z0-9]`, which emptied a Devanagari or Tamil
+    // label completely. Because `matchesTerm` normalises the rule term the same
+    // way, a term written in those scripts normalised to the empty string and
+    // could never match: non-Latin coverage was structurally impossible rather
+    // than merely missing, so a Tamil label declaring egg and milk came back
+    // SAFE.
+    //
+    // `\p{M}` is load-bearing. Indic vowel signs are combining marks (category
+    // Mn), not letters, so leaving them out shatters every Indic word: "तेल"
+    // (oil) became "त ल" and turned the syllable into two separate tokens.
+    // Separators such as the Devanagari danda (।) are punctuation and are
+    // correctly dropped here.
+    .replace(/[^\p{L}\p{M}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

@@ -6,6 +6,81 @@ const SEVERITIES = new Set(['unsafe', 'caution']);
 const CATEGORIES = new Set(['allergen', 'additive', 'substance', 'label-warning']);
 
 /**
+ * Single-character test for a combining mark, i.e. Unicode category Mn/Mc/Me.
+ */
+const COMBINING_MARK = /\p{M}/u;
+
+/**
+ * Whether a character counts as part of a word for term matching.
+ *
+ * `\b` is defined in terms of `\w`, which is ASCII-only, so it cannot delimit a
+ * Devanagari or Arabic term: `\bगेहूँ\b` never matches, because the space either
+ * side is a non-word character and so is `ग`. Regex has no clean Unicode
+ * equivalent to `\b`, so the boundary is checked directly over the normalised
+ * strings instead.
+ *
+ * Combining marks are deliberately treated as word *boundaries*. In Brahmic
+ * scripts a vowel sign attaches to the consonant before it, so a word can run on
+ * without any new letter: the Bengali genitive "গমের" (of wheat) is the letters
+ * `गम` plus one vowel sign. Treating the mark as transparent lets the term `गम`
+ * match, which is the behaviour a reader expects.
+ */
+function isWordChar(char: string | undefined): boolean {
+  if (char === undefined) return false;
+  const code = char.codePointAt(0) as number;
+  if (COMBINING_MARK.test(char)) return false;
+  if (code >= 97 && code <= 122) return true; // a-z
+  if (code >= 65 && code <= 90) return true; // A-Z
+  if (code >= 48 && code <= 57) return true; // 0-9
+  if (code === 95) return true; // _
+  return code > 127;
+}
+
+/**
+ * Memoised term normalisation.
+ *
+ * The ruleset now carries roughly 900 match terms, and every one of them is
+ * normalised on every ingredient, so without this the cost of a single scan
+ * rose by an order of magnitude for a value that never changes. Terms are static
+ * bundled data, so the cache never needs invalidating.
+ */
+const normalizedTermCache = new Map<string, string>();
+
+function normalizeTerm(term: string): string {
+  const cached = normalizedTermCache.get(term);
+  if (cached !== undefined) return cached;
+
+  const normalized = normalize(term);
+  normalizedTermCache.set(term, normalized);
+  return normalized;
+}
+
+/**
+ * Whole-term substring match: the same semantics as `\b<term>\b`, but
+ * script-aware.
+ *
+ * Scans forward until it finds an occurrence with non-word characters on both
+ * sides. An occurrence inside a longer word is not a hit, which is what keeps the
+ * exclude vetoes meaningful.
+ */
+function matchesTerm(normalizedIngredient: string, term: string): boolean {
+  const normalizedTerm = normalizeTerm(term);
+  if (!normalizedTerm) return false;
+
+  let from = 0;
+  for (;;) {
+    const at = normalizedIngredient.indexOf(normalizedTerm, from);
+    if (at === -1) return false;
+
+    const before = normalizedIngredient[at - 1];
+    const after = normalizedIngredient[at + normalizedTerm.length];
+    if (!isWordChar(before) && !isWordChar(after)) return true;
+
+    from = at + 1;
+  }
+}
+
+/**
  * Structurally validates the bundled ruleset.
  *
  * The JSON is imported statically so it is type-checked and bundled, but a typo
@@ -99,7 +174,7 @@ function compiledRules(ruleset: Ruleset): CompiledRule[] {
   return compiled;
 }
 
-function matchesTerm(normalizedIngredient: string, term: RegExp): boolean {
+function matchesTermCompiled(normalizedIngredient: string, term: RegExp): boolean {
   return term.test(normalizedIngredient);
 }
 
@@ -108,10 +183,10 @@ function matchIngredientAgainstRules(
   rules: CompiledRule[]
 ): CompiledRule[] {
   return rules.filter(({ match, exclude }) => {
-    if (!match.some(term => matchesTerm(normalizedIngredient, term))) return false;
+    if (!match.some(term => matchesTermCompiled(normalizedIngredient, term))) return false;
     // A veto term cancels the match: "butter" is milk, but "peanut butter" and
     // "cocoa butter" are not.
-    if (exclude.some(term => matchesTerm(normalizedIngredient, term))) return false;
+    if (exclude.some(term => matchesTermCompiled(normalizedIngredient, term))) return false;
     return true;
   });
 }

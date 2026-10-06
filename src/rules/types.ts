@@ -1,4 +1,15 @@
+import type { AiProvenance, AnalysisSource, Coverage } from '../ai/types';
+
 export type Severity = 'unsafe' | 'caution';
+
+/**
+ * Re-exported from the AI layer so the domain types can describe coverage without
+ * the rules package depending on the feature, and so there is exactly one
+ * definition of each union in the codebase.
+ *
+ * `src/ai/types.ts` imports nothing, so this introduces no cycle.
+ */
+export type { Coverage, AnalysisSource, AiProvenance };
 
 export type FlagCategory = 'allergen' | 'additive' | 'substance' | 'label-warning';
 
@@ -72,4 +83,15 @@ export interface ScanResult {
   offUrl?: string;
   createdAt: string;
   rulesetVersion: string;
+  /**
+   * How much confidence the pipeline has that it actually read the label.
+   *
+   * 'unverified' is the value that matters: the rule set could not read this
+   * label's language, so a clean verdict must not be shown as a bill of health.
+   */
+  coverage?: Coverage;
+  /** Which tier produced the verdict, for the result screen's disclosure. */
+  analysisSource?: AnalysisSource;
+  /** Coverage and ruleset version the verdict was recorded under. */
+  aiProvenance?: AiProvenance;
 }
