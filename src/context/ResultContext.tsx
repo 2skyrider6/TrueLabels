@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useMemo, ReactNode, useCallback } from 'react';
 import { ScanResult } from '../rules/types';
 import {
   saveScan,
@@ -84,21 +84,26 @@ export function ResultProvider({ children }: { children: ReactNode }) {
     setResultState(null);
   }, []);
 
-  return (
-    <ResultContext.Provider
-      value={{
-        result,
-        setResult,
-        clearResult,
-        scans: page.scans,
-        hasMore: page.hasMore,
-        refreshScans,
-        loadMore,
-      }}
-    >
-      {children}
-    </ResultContext.Provider>
+  /**
+   * Memoized so the context value keeps a stable identity across renders that
+   * do not change the data. As a bare object literal it was new on every
+   * render, which re-rendered every consumer — including the scanner screen,
+   * whose `CameraView` is an expensive subtree to reconcile.
+   */
+  const value = useMemo<ResultContextType>(
+    () => ({
+      result,
+      setResult,
+      clearResult,
+      scans: page.scans,
+      hasMore: page.hasMore,
+      refreshScans,
+      loadMore,
+    }),
+    [result, page, setResult, clearResult, refreshScans, loadMore]
   );
+
+  return <ResultContext.Provider value={value}>{children}</ResultContext.Provider>;
 }
 
 export function useResult(): ResultContextType {

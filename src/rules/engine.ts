@@ -52,19 +52,66 @@ export function loadRuleset(): Ruleset {
   return cached;
 }
 
-function matchesTerm(normalizedIngredient: string, term: string): boolean {
-  const normalizedTerm = normalize(term);
-  if (!normalizedTerm) return false;
-  const escaped = normalizedTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`\\b${escaped}\\b`).test(normalizedIngredient);
+/** A rule with every term already compiled to a whole-word matcher. */
+interface CompiledRule {
+  rule: Rule;
+  match: RegExp[];
+  exclude: RegExp[];
 }
 
-function matchIngredientAgainstRules(normalizedIngredient: string, rules: Rule[]): Rule[] {
-  return rules.filter(rule => {
-    if (!rule.match.some(term => matchesTerm(normalizedIngredient, term))) return false;
+function compileTerm(term: string): RegExp | null {
+  const normalizedTerm = normalize(term);
+  if (!normalizedTerm) return null;
+  const escaped = normalizedTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\b${escaped}\\b`);
+}
+
+function compileRule(rule: Rule): CompiledRule {
+  const compileAll = (terms: string[]) =>
+    terms.map(compileTerm).filter((re): re is RegExp => re !== null);
+
+  return {
+    rule,
+    match: compileAll(rule.match),
+    exclude: rule.exclude ? compileAll(rule.exclude) : [],
+  };
+}
+
+/**
+ * Compiled matchers, cached per ruleset.
+ *
+ * Building a `RegExp` per term for every ingredient of every rule meant
+ * `ingredients x rules x terms` compilations on each scan, which showed up as
+ * jank on long labels. The terms never change at runtime, so they are compiled
+ * once and reused. Keyed by object identity rather than a single module-level
+ * entry, because `evaluateEngine` also accepts caller-supplied rulesets.
+ *
+ * WeakMap so a discarded ruleset does not leak its compiled matchers.
+ */
+const compiledCache = new WeakMap<Ruleset, CompiledRule[]>();
+
+function compiledRules(ruleset: Ruleset): CompiledRule[] {
+  const existing = compiledCache.get(ruleset);
+  if (existing) return existing;
+
+  const compiled = ruleset.rules.map(compileRule);
+  compiledCache.set(ruleset, compiled);
+  return compiled;
+}
+
+function matchesTerm(normalizedIngredient: string, term: RegExp): boolean {
+  return term.test(normalizedIngredient);
+}
+
+function matchIngredientAgainstRules(
+  normalizedIngredient: string,
+  rules: CompiledRule[]
+): CompiledRule[] {
+  return rules.filter(({ match, exclude }) => {
+    if (!match.some(term => matchesTerm(normalizedIngredient, term))) return false;
     // A veto term cancels the match: "butter" is milk, but "peanut butter" and
     // "cocoa butter" are not.
-    if (rule.exclude?.some(term => matchesTerm(normalizedIngredient, term))) return false;
+    if (exclude.some(term => matchesTerm(normalizedIngredient, term))) return false;
     return true;
   });
 }
@@ -81,12 +128,13 @@ function collect(
   options: CollectOptions
 ): Flag[] {
   const flags: Flag[] = [];
+  const rules = compiledRules(ruleset);
 
   for (const item of items) {
     const normalized = normalize(item);
     if (!normalized) continue;
 
-    for (const rule of matchIngredientAgainstRules(normalized, ruleset.rules)) {
+    for (const { rule } of matchIngredientAgainstRules(normalized, rules)) {
       if (seen.has(rule.id)) continue;
       seen.add(rule.id);
       flags.push({
