@@ -1,0 +1,56 @@
+name: Quality gate
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: App environment the change targets
+        required: false
+        default: development
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Lint · Typecheck · Unit tests · Build · Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests with coverage
+        run: npm run test:coverage
+
+      - name: Bundle check (Metro release bundle)
+        run: npx expo export --platform android --output-dir dist
+
+      - name: Security - dependency review
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+
+      - name: "Security - npm audit (blocking: critical)"
+        run: npm audit --omit=dev --audit-level=critical
+
+      - name: "Security - npm audit report (high+, non-blocking)"
+        if: always()
+        run: npm audit --omit=dev --audit-level=high || echo "::warning::High+ advisories in the Expo SDK 57 transitive tree are tracked in docs/cicd/environment-matrix.md#security-baseline"
+
+      - name: Security - expo-doctor
+        run: npx expo-doctor

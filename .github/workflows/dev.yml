@@ -1,0 +1,90 @@
+name: Dev pipeline
+
+on:
+  push:
+    branches: [develop]
+
+env:
+  EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
+  SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+    with:
+      environment: development
+    permissions:
+      contents: read
+
+  ui-tests:
+    needs: quality
+    name: UI tests (Maestro · Android dev client)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync development env
+        run: node scripts/sync-env.js development
+
+      - name: Build Android dev client
+        run: |
+          npx eas-cli build -p android -e development --wait --json > build.json
+          BUILD_ID=$(node scripts/build-id.js < build.json)
+          echo "build id: $BUILD_ID"
+          npx eas-cli build:download --build-id "$BUILD_ID"
+
+      - name: Run Maestro flows on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          script: |
+            APK=$(ls *.apk | head -n 1)
+            adb install "$APK"
+            adb shell pm grant com.truelabels.app android.permission.CAMERA || true
+            curl -Ls "https://get.maestro.mobile.dev" | bash
+            export PATH="$PATH:$HOME/.maestro/bin:$HOME/.local/bin"
+            maestro test tests/e2e/flows
+
+  ota-preview:
+    needs: quality
+    name: Publish OTA preview (EAS Update)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync development env
+        run: node scripts/sync-env.js development
+
+      - name: Ensure development channel exists
+        run: npx eas-cli channel:create development --non-interactive || true
+
+      - name: Publish update to development channel
+        run: npx eas-cli update --branch develop --channel development --auto --non-interactive
+
+      - name: Upload source maps to Sentry
+        run: npx sentry-expo-upload-sourcemaps dist

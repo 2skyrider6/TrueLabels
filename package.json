@@ -1,11 +1,12 @@
 {
   "name": "truelabels",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/log-box": "^57.0.4",
     "@expo/metro-runtime": "~57.0.16",
     "@expo/vector-icons": "^15.0.2",
+    "@sentry/react-native": "~7.11.0",
     "expo": "~57.0.26",
     "expo-build-properties": "~57.0.22",
     "expo-camera": "~57.0.6",
@@ -19,6 +20,7 @@
     "expo-splash-screen": "~57.0.9",
     "expo-sqlite": "~57.0.3",
     "expo-status-bar": "~57.0.1",
+    "expo-updates": "~57.0.24",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
@@ -31,6 +33,7 @@
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
     "jest": "~29.7.0",
+    "sentry-expo-upload-sourcemaps": "^5.24.1",
     "ts-jest": "^29.4.14",
     "typescript": "~6.0.3"
   },
@@ -42,8 +45,11 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "test:coverage": "jest --coverage",
     "eval:baseline": "jest src/ai/eval/report.test.ts",
-    "rules:coverage": "node scripts/derive-covered-scripts.js"
+    "rules:coverage": "node scripts/derive-covered-scripts.js",
+    "env:sync": "node scripts/sync-env.js",
+    "version:bump": "node scripts/bump-version.js"
   },
   "private": true
 }

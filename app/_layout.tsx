@@ -1,9 +1,24 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as Sentry from '@sentry/react-native';
 import { ResultProvider } from '@/context/ResultContext';
+import { appEnvironment, isDevelopment, sentryDsn } from '@/config/env';
 import { colors, typography } from '@/theme/tokens';
 
-export default function RootLayout() {
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    environment: appEnvironment,
+    enableAutoSessionTracking: true,
+    sessionTrackingIntervalMillis: 20000,
+    tracesSampleRate: isDevelopment ? 0 : 0.05,
+    profilesSampleRate: isDevelopment ? 0 : 0.05,
+    enableLogs: !isDevelopment,
+    sendDefaultPii: false,
+  });
+}
+
+function RootLayout() {
   return (
     <ResultProvider>
       <StatusBar style="dark" />
@@ -31,3 +46,7 @@ export default function RootLayout() {
     </ResultProvider>
   );
 }
+
+const WrappedRootLayout = Sentry.wrap(RootLayout);
+
+export { WrappedRootLayout as default };

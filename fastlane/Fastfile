@@ -1,0 +1,162 @@
+APP_NAME = 'TrueLabels'
+BUNDLE_ID = 'com.truelabels.app'
+
+def app_version
+  JSON.parse(File.read('app.json'))['expo']['version']
+end
+
+def sync_env(environment)
+  sh("node scripts/sync-env.js #{environment}")
+end
+
+def eas(*args)
+  sh("npx eas-cli #{args.join(' ')}")
+end
+
+desc 'Run the local quality gate (lint, typecheck, unit tests, bundle check, security scan)'
+lane :quality do
+  sh('npm ci')
+  sh('npm run lint')
+  sh('npm run typecheck')
+  sh('npm run test:coverage')
+  sh('npx expo export --platform android --output-dir dist')
+  sh('npm audit --omit=dev --audit-level=critical')
+  sh('npx expo-doctor')
+end
+
+desc 'Bump semantic version (patch|minor|major), commit and tag. Pushing the tag triggers the release pipeline.'
+lane :bump do |options|
+  bump_type = options[:type] || 'patch'
+  sync_env('production')
+  sh("node scripts/bump-version.js #{bump_type}")
+  version = app_version
+  sh('git add app.json package.json')
+  sh("git commit -m 'chore(release): v#{version}'")
+  sh("git tag v#{version}")
+  UI.success("Bumped to v#{version}. Push the commit and tag: git push && git push origin v#{version}")
+end
+
+desc 'Build development clients for both platforms and publish an OTA preview to the development channel'
+lane :dev do
+  quality
+  sync_env('development')
+  eas('build', '-p', 'all', '-e', 'development', '--wait', '--non-interactive')
+  eas('channel:create', 'development', '--non-interactive')
+  eas('update', '--branch', 'develop', '--channel', 'development', '--auto', '--non-interactive')
+  upload_sourcemaps
+end
+
+desc 'Build the staging beta, distribute to TestFlight + Play Internal, and create the Sentry release'
+lane :staging do
+  quality
+  sync_env('staging')
+  eas('build', '-p', 'all', '-e', 'staging', '--wait', '--non-interactive')
+  submit_beta(profile: 'staging')
+  create_sentry_release(environment: 'staging')
+end
+
+desc 'Build the production release and deliver beta builds to TestFlight + Play Internal'
+lane :production do
+  quality
+  sync_env('production')
+  eas('build:version:get', '-p', 'all', '--non-interactive')
+  eas('build', '-p', 'all', '-e', 'production', '--wait', '--non-interactive')
+  submit_beta(profile: 'production')
+  create_sentry_release(environment: 'production')
+end
+
+desc 'Publish an over-the-air update (environment: development|staging|production; branch/channel default to the environment and current git branch)'
+lane :ota do |options|
+  environment = options[:environment] || 'development'
+  channel = options[:channel] || environment
+  branch = options[:branch] || `git rev-parse --abbrev-ref HEAD`.strip
+  sync_env(environment)
+  eas('channel:create', channel, '--non-interactive')
+  eas('update', '--branch', branch, '--channel', channel, '--auto', '--non-interactive')
+  upload_sourcemaps
+end
+
+desc 'Roll back an EAS Update channel to the previously published update (pass the bad update group id, or omit it for the interactive picker)'
+lane :rollback_ota do |options|
+  platform = options[:platform] || 'all'
+  if options[:group]
+    eas('update:rollback', options[:group], '-p', platform, '--force-end-active-rollout', '--non-interactive')
+  else
+    eas('update:rollback', '-p', platform)
+  end
+end
+
+desc 'Roll back an EAS Update channel to the update embedded in the build (use when no previous update exists)'
+lane :rollback_embedded do |options|
+  platform = options[:platform] || 'all'
+  eas('update:rollback', options[:group], '-p', platform, '--force-end-active-rollout', '--non-interactive')
+end
+
+desc 'Pause an EAS Update channel so clients stop receiving updates'
+lane :pause_channel do |options|
+  eas('channel:pause', options[:channel] || 'production', '--non-interactive')
+end
+
+desc 'Resume a paused EAS Update channel'
+lane :resume_channel do |options|
+  eas('channel:resume', options[:channel] || 'production', '--non-interactive')
+end
+
+desc 'Show EAS Update adoption, crash and unique-user insights for a channel (pass channel and runtime_version)'
+lane :release_health do |options|
+  args = ['channel:insights', '--channel', options[:channel] || 'production', '--runtime-version', options[:runtime_version], '--days', (options[:days] || '7').to_s, '--non-interactive']
+  eas(*args)
+end
+
+desc 'Upload generated source maps from dist/ to Sentry'
+lane :upload_sourcemaps do
+  sh('npx sentry-expo-upload-sourcemaps dist')
+end
+
+desc 'Create and finalize a Sentry release for the current app version'
+lane :create_sentry_release do |options|
+  environment = options[:environment] || 'production'
+  version = app_version
+  sh("npx sentry-cli releases -p #{APP_NAME.downcase} new #{version} --finalize")
+  sh("npx sentry-cli releases -p #{APP_NAME.downcase} set-commits #{version} --auto")
+  sh("npx sentry-cli releases -p #{APP_NAME.downcase} deploys #{version} new -e #{environment}")
+end
+
+desc 'Configure code signing credentials with EAS (interactive; credentials live in the EAS credential store, never in git)'
+lane :signing do |options|
+  eas('credentials:configure-build', '-p', options[:platform] || 'all')
+end
+
+desc 'Verify local environment: doctor, remote version source, and EAS env vars per environment'
+lane :preflight do
+  sh('npx expo-doctor')
+  eas('build:version:get', '-p', 'all', '--non-interactive')
+  eas('env:list', 'production', '--non-interactive')
+  eas('env:list', 'staging', '--non-interactive')
+  eas('env:list', 'development', '--non-interactive')
+  UI.message('Verify locally: SENTRY_AUTH_TOKEN, EAS_TOKEN, EXPO_APPLE_ID and EXPO_APPLE_APP_SPECIFIC_PASSWORD are set in the CI secret store, not in this repo.')
+end
+
+platform :ios do
+  desc 'Submit the latest iOS build to TestFlight (Truelabels Internal group)'
+  lane :beta do |options|
+    profile = options[:profile] || 'staging'
+    sync_env(profile == 'production' ? 'production' : 'staging')
+    eas('submit', '-p', 'ios', '-e', profile, '--non-interactive', '--auto-testflight-setup', '-g', 'Truelabels Internal')
+  end
+end
+
+platform :android do
+  desc 'Submit the latest Android build to Google Play Internal testing'
+  lane :internal do |options|
+    profile = options[:profile] || 'staging'
+    sync_env(profile == 'production' ? 'production' : 'staging')
+    eas('submit', '-p', 'android', '-e', profile, '--non-interactive')
+  end
+end
+
+def submit_beta(profile)
+  sync_env(profile == 'production' ? 'production' : 'staging')
+  eas('submit', '-p', 'ios', '-e', profile, '--non-interactive', '--auto-testflight-setup', '-g', 'Truelabels Internal')
+  eas('submit', '-p', 'android', '-e', profile, '--non-interactive')
+end

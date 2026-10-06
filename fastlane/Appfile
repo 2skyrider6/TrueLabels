@@ -1,0 +1,2 @@
+app_identifier('com.truelabels.app')
+package_name('com.truelabels.app')

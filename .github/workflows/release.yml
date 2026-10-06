@@ -1,0 +1,143 @@
+name: Release pipeline
+
+on:
+  push:
+    tags: [v*.*.*]
+
+env:
+  EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
+  SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+  EXPO_APPLE_ID: ${{ secrets.EXPO_APPLE_ID }}
+  EXPO_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+    with:
+      environment: production
+    permissions:
+      contents: read
+
+  verify-version:
+    name: Verify tag matches app version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check semver tag vs app.json
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          APP_VERSION=$(node -e "console.log(require('./app.json').expo.version)")
+          echo "tag: $TAG_VERSION, app.json: $APP_VERSION"
+          if [ "$TAG_VERSION" != "$APP_VERSION" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match app.json version ${APP_VERSION}. Run the version bump first (fastlane bump or npm run version:bump), commit, then re-tag."
+            exit 1
+          fi
+
+  build:
+    needs: [quality, verify-version]
+    name: Build release (iOS + Android)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync production env
+        run: node scripts/sync-env.js production
+
+      - name: Report current build numbers
+        run: |
+          npx eas-cli build:version:get -p all --non-interactive || true
+
+      - name: Build with EAS (store-signed, remote build-number increment)
+        run: npx eas-cli build -p all -e production --wait --non-interactive
+
+  submit:
+    needs: build
+    name: Distribute beta (TestFlight + Play Internal)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync production env
+        run: node scripts/sync-env.js production
+
+      - name: Submit iOS to TestFlight
+        run: >
+          npx eas-cli submit -p ios -e production --non-interactive
+          --auto-testflight-setup
+          -g "Truelabels Internal"
+          --what-to-test "Production candidate ${{ github.ref_name }}. Smoke test scan, OCR, history; verify crash-free session in Sentry."
+
+      - name: Submit Android to Play Internal
+        run: npx eas-cli submit -p android -e production --non-interactive
+
+  sentry-release:
+    needs: build
+    name: Create Sentry release (production)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read app version
+        id: version
+        run: echo "app=$(node -e "console.log(require('./app.json').expo.version)")" >> "$GITHUB_OUTPUT"
+
+      - name: Create Sentry release
+        uses: getsentry/sentry-release@v1
+        with:
+          environment: production
+          version: ${{ steps.version.outputs.app }}
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+
+  github-release:
+    needs: [submit, sentry-release]
+    name: Draft GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Draft release notes
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          echo "# ${VERSION}" > release-notes.md
+          echo "" >> release-notes.md
+          echo "Beta build delivered to TestFlight (Truelabels Internal) and Google Play Internal testing." >> release-notes.md
+          echo "Promote to production tracks after verification — see docs/cicd/release-checklist.md." >> release-notes.md
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: release-notes.md
+          draft: true
+          prerelease: false
