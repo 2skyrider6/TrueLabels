@@ -63,7 +63,22 @@ function compileTerm(term: string): RegExp | null {
   const normalizedTerm = normalize(term);
   if (!normalizedTerm) return null;
   const escaped = normalizedTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`\\b${escaped}\\b`);
+  // `\b` is defined by `\w`, which is `[A-Za-z0-9_]` in every engine, so a term
+  // in Devanagari, Tamil, Han or any other non-Latin script had no boundary to
+  // match at: the regex compiled without error and could never fire. The
+  // ruleset carries several hundred such terms, so every non-Latin label came
+  // back SAFE while the coverage check believed those scripts covered.
+  //
+  // Boundaries are asserted with Unicode-aware character classes instead.
+  // Lookbehind would read better and is supported here, but a rejected
+  // lookbehind would throw while `loadRuleset` compiles the terms and take the
+  // app down on launch — not a risk worth taking for syntax. This form is
+  // correct for how terms are used: each one is tested on its own against a
+  // single ingredient, so consuming a boundary character cannot cause a miss.
+  return new RegExp(
+    `(?:^|[^\\p{L}\\p{M}\\p{N}])${escaped}(?:[^\\p{L}\\p{M}\\p{N}]|$)`,
+    'u'
+  );
 }
 
 function compileRule(rule: Rule): CompiledRule {

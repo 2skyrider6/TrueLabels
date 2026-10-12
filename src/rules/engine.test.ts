@@ -419,3 +419,98 @@ describe('non-English labels are still analysed', () => {
     expect(idsFor('Azucar, sal, agua carbonatada')).toEqual([]);
   });
 });
+
+/**
+ * `compileTerm` used to wrap every term in `\b`. `\b` is defined by `\w`, which
+ * is `[A-Za-z0-9_]` in every engine, so a term written in Devanagari, Tamil or
+ * Han had no boundary it could ever match at. The regex compiled without error
+ * and simply never fired.
+ *
+ * The failure was invisible rather than loud: the ruleset carries several
+ * hundred non-Latin terms, and coverage correctly reports those scripts as
+ * readable because they *are* in the ruleset — so a non-Latin label came back
+ * SAFE and trusted. Eleven of the eighteen evaluation cases failed that way.
+ */
+describe('non-Latin scripts match with whole-word semantics', () => {
+  const ruleset = loadRuleset();
+  const idsFor = (text: string) =>
+    evaluateEngine(parseIngredients(text), ruleset).flags.map(f => f.id);
+
+  // गेहूँ  मूंगफली  दूध  अंडा
+  const [hindiWheat, hindiPeanut, hindiMilk, hindiEgg] = [
+    '\u0917\u0947\u0939\u0942\u0901',
+    '\u092e\u0942\u0902\u0917\u092b\u0932\u0940',
+    '\u0926\u0942\u0927',
+    '\u0905\u0902\u0921\u093e',
+  ];
+
+  // கோதுமை  முட்டை  দুধ  গম  গমের
+  const [tamilWheat, tamilEgg, bengaliMilk, bengaliWheat, bengaliWheatGenitive] = [
+    '\u0b95\u0bcb\u0ba4\u0bc1\u0bae\u0bc8',
+    '\u0bae\u0bc1\u0b9f\u0bcd\u0b9f\u0bc8',
+    '\u09a6\u09c1\u09a7',
+    '\u0997\u09ae',
+    '\u0997\u09ae\u09c7\u09b0',
+  ];
+
+  // فستق
+  const arabicPeanut = '\u0641\u0633\u062a\u0642';
+
+  test('Devanagari: wheat, peanut, milk and egg are all detected', () => {
+    const ids = idsFor([hindiMilk, hindiWheat, hindiPeanut, hindiEgg].join(', '));
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        'allergen:wheat',
+        'allergen:peanut',
+        'allergen:milk',
+        'allergen:egg',
+      ])
+    );
+  });
+
+  test('Tamil: wheat and egg are detected', () => {
+    expect(idsFor(`${tamilWheat}, ${tamilEgg}`)).toEqual(
+      expect.arrayContaining(['allergen:wheat', 'allergen:egg'])
+    );
+  });
+
+  test('Arabic: peanut is detected', () => {
+    expect(idsFor(arabicPeanut)).toContain('allergen:peanut');
+  });
+
+  test('Bengali: the base word and its inflected form both match their own term', () => {
+    // These are separate ruleset terms rather than one stem plus a suffix rule,
+    // because a suffix is part of the word for matching purposes. A Bengali
+    // pack reading "গমের আটা" has to be caught by the "গমের" term.
+    expect(idsFor(`${bengaliMilk}, ${bengaliWheat}`)).toContain('allergen:wheat');
+    expect(idsFor(`${bengaliMilk}, ${bengaliWheatGenitive}`)).toContain('allergen:wheat');
+    expect(idsFor(`${bengaliMilk}, ${bengaliWheatGenitive}`)).toContain('allergen:milk');
+  });
+
+  test('a non-Latin word that only shares a prefix is not matched', () => {
+    // The other half of the contract. Without a real boundary the fix would
+    // degrade into substring matching, which trades a false-safe for a false
+    // alarm — the same class of bug, pointing the other way.
+    const stemOnly = {
+      rulesetVersion: 'test-boundary',
+      rules: [
+        {
+          id: 'allergen:wheat',
+          match: [bengaliWheat],
+          severity: 'unsafe' as Severity,
+          label: 'Wheat/gluten',
+          reason: 'test fixture',
+          category: 'allergen' as const,
+        },
+      ],
+    } as { rulesetVersion: string; rules: Rule[] };
+
+    const boundaryIdsFor = (text: string) =>
+      evaluateEngine(parseIngredients(text), stemOnly).flags.map(f => f.id);
+
+    // The bare term matches.
+    expect(boundaryIdsFor(bengaliWheat)).toContain('allergen:wheat');
+    // Adding a suffix makes it a different word, so it must not match.
+    expect(boundaryIdsFor(bengaliWheatGenitive)).not.toContain('allergen:wheat');
+  });
+});

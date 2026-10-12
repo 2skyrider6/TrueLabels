@@ -177,14 +177,35 @@ npm run eval:baseline # the release-gate evaluation suite
 The UI suite is built on one rule: **no wall-clock waiting.** Every async dependency resolves
 immediately or on a fake timer, because a test that only passes on a fast machine is not a test.
 
-### Known open issue
+### The evaluation gate
 
-`src/ai/eval/report.test.ts` currently reports a `falseSafeRate` of **0.61** against the
-multilingual gold set: a majority of labels that should have flagged are being presented as a
-trusted `SAFE`. The validation set spans several languages, but the bundled rule set covers
-Latin-script terms only, so the gap is expected to be multi-language rule coverage rather than
-a logic fault. This is the first thing worth fixing, and it is tracked as a release blocker —
-contributions here are the most valuable the project can receive.
+`src/ai/eval/report.test.ts` is a release gate, not just a test. It measures the pipeline
+against a gold set and asserts `falseSafeRate` stays at **0**, `allergenRecall` stays at or above
+**95%**, and `abstentionRate` stays at **100%**. The gate is currently green on all three.
+
+It caught a real bug worth telling, because it is exactly the failure this architecture exists to
+prevent — and because it failed *silently*:
+
+Every ruleset term was compiled as `\bterm\b`. `\b` is defined by `\w`, which is `[A-Za-z0-9_]`
+in every engine, so a term written in Devanagari, Tamil or Han had no boundary it could ever
+match at. The regex compiled without error and simply never fired. The ruleset carried several
+hundred non-Latin terms — they were there — and coverage correctly reported those scripts as
+readable *because they were in the ruleset*. So a Devanagari label declaring wheat and peanut
+came back **SAFE and trusted**, and nothing downstream could see that the matching had been
+structurally impossible rather than merely incomplete. Eleven of the eighteen gold cases failed
+that way.
+
+The fix asserts Unicode-aware boundaries instead, and the suite now carries a regression test
+for both halves of the contract: that a non-Latin term matches, and that a word sharing only a
+prefix does not.
+
+### What the gate does not yet prove
+
+The gold set is eighteen curated cases. It demonstrates that the abstention and coverage
+mechanisms work, not that rule coverage is broad. Inflected forms are listed as explicit terms
+per language, so any language whose morphology has not yet been curated will still miss — a
+Bengali pack reading `গমের আটা` needs the inflected `গমের` term alongside the base `গম`. That
+breadth is the ongoing work, and it is where contributions are most valuable.
 
 ---
 
@@ -204,7 +225,7 @@ Good first contributions:
 
 ## Roadmap
 
-- [ ] Close the multi-language rule-coverage gap (see the evaluation issue above)
+- [ ] Broaden rule coverage for inflected languages, where each form needs its own term
 - [ ] Vegan and diet-profile rule sets beyond vegetarian marking
 - [ ] Category and additive-density heuristics for a judgment call
 - [ ] Localisation of the UI itself
