@@ -1,6 +1,30 @@
 {
   "name": "truelabels",
   "version": "1.0.1",
+  "description": "Offline-first food allergen and additive scanner for Android and iOS. Photograph an ingredient label and get an allergen, additive, and dietary verdict on device — no account, no upload, no network required.",
+  "keywords": [
+    "expo",
+    "react-native",
+    "allergen",
+    "food-safety",
+    "offline-first",
+    "ocr",
+    "ingredients",
+    "scanner",
+    "openfoodfacts",
+    "iOS",
+    "Android"
+  ],
+  "license": "MIT",
+  "author": "TrueLabels contributors",
+  "homepage": "https://github.com/2skyrider6/TrueLabels#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/2skyrider6/TrueLabels.git"
+  },
+  "bugs": {
+    "url": "https://github.com/2skyrider6/TrueLabels/issues"
+  },
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/log-box": "^57.0.4",
@@ -15,20 +39,24 @@
     "expo-dev-client": "^57.0.19",
     "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
+    "expo-haptics": "~57.0.3",
     "expo-linking": "~57.0.11",
     "expo-mlkit-ocr": "^0.2.7",
-    "expo-router": "~57.0.24",
+    "expo-router": "^57.0.24",
     "expo-splash-screen": "~57.0.9",
     "expo-sqlite": "~57.0.3",
     "expo-status-bar": "~57.0.1",
     "expo-updates": "~57.0.24",
     "react": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-reanimated": "^4.5.1",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-screens": "~4.26.0"
+    "react-native-screens": "^4.26.0",
+    "react-native-worklets": "0.10.0"
   },
   "devDependencies": {
     "@react-native/jest-preset": "^0.86.3",
+    "@testing-library/jest-native": "^5.4.3",
     "@testing-library/react-native": "^14.0.1",
     "@types/jest": "29.5.14",
     "@types/react": "~19.2.2",
@@ -56,6 +84,5 @@
     "rules:coverage": "node scripts/derive-covered-scripts.js",
     "env:sync": "node scripts/sync-env.js",
     "version:bump": "node scripts/bump-version.js"
-  },
-  "private": true
+  }
 }

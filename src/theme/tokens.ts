@@ -3,62 +3,74 @@ import { Platform } from 'react-native';
 /**
  * Design tokens for the app.
  *
- * Screens never hardcode a colour or a radius; they reference these so spacing,
- * elevation and palette stay consistent across the scanner, the result view,
- * history and the manual entry screens.
+ * Clinical Purity & Consumer Trust design system.
+ * Colors, typography, spacing, radii, and elevation for food safety analysis.
  */
 
-/** Brand and semantic palette. Kept small and high-contrast on purpose. */
+// ============================================================================
+// COLOR PALETTE
+// ============================================================================
+
+/** Brand and semantic palette. High-contrast, clinical authority. */
 export const colors = {
-  /** Primary brand colour, used for primary actions and active states. */
-  primary: '#0F766E',
-  primaryPressed: '#0B5A54',
-  primarySoft: '#E6F4F1',
-  primaryBorder: '#99D6CF',
+  /** Primary — deep oceanic navy for institutional authority and CTAs. */
+  primary: '#1E3E62',
+  primaryPressed: '#01284B',
+  primarySoft: '#E5EEFF',
+  primaryBorder: '#AAC9F4',
 
-  /** Screen and surface backgrounds. */
-  background: '#F7F8FA',
+  /** Screen and surface backgrounds. Clean slate white foundation. */
+  background: '#F8FAFC',
   surface: '#FFFFFF',
-  surfaceSunken: '#F1F3F5',
-  surfaceMuted: '#EDEFF2',
+  surfaceSunken: '#F1F5F9',
+  surfaceMuted: '#E2E8F0',
 
-  /** Text. `muted` is the body-secondary tone, `subtle` is for metadata only. */
-  text: '#111827',
-  textSecondary: '#4B5563',
-  textMuted: '#6B7280',
-  textSubtle: '#9CA3AF',
+  /** Text hierarchy. */
+  text: '#0F172A',
+  textSecondary: '#475569',
+  textMuted: '#64748B',
+  textSubtle: '#94A3B8',
   textInverse: '#FFFFFF',
 
-  border: '#E3E6EA',
-  borderStrong: '#CFD4DA',
+  /** Borders. */
+  border: '#E2E8F0',
+  borderStrong: '#CBD5E1',
 
-  /** Verdict colours. Deliberately desaturated so the UI stays calm. */
-  safe: '#15803D',
-  safeSoft: '#E8F5EC',
-  safeBorder: '#A7D8B8',
+  /** Verdict colours — desaturated, clinical, instant semantic feedback. */
+  safe: '#10B981',
+  safeSoft: '#ECFDF5',
+  safeBorder: '#A7F3D0',
 
-  caution: '#B45309',
-  cautionSoft: '#FDF3E3',
-  cautionBorder: '#EFC999',
+  caution: '#F59E0B',
+  cautionSoft: '#FFFBEB',
+  cautionBorder: '#FDE68A',
 
-  danger: '#B91C1C',
-  dangerPressed: '#991B1B',
-  dangerSoft: '#FBEDED',
-  dangerBorder: '#EFB4B4',
+  danger: '#EF4444',
+  dangerPressed: '#DC2626',
+  dangerSoft: '#FEF2F2',
+  dangerBorder: '#FECACA',
 
-  neutral: '#4B5563',
-  neutralSoft: '#F1F3F5',
-  neutralBorder: '#D7DBE0',
+  /** Non-veg marker — FSSAI brown. */
+  nonVeg: '#854D0E',
+  nonVegSoft: '#FFF7ED',
+  nonVegBorder: '#FED7AA',
 
-  /** In-code colours only: the camera preview and overlays. */
+  neutral: '#475569',
+  neutralSoft: '#F1F5F9',
+  neutralBorder: '#E2E8F0',
+
+  /** Camera overlay colours. */
   onCamera: '#FFFFFF',
-  overlay: 'rgba(17, 24, 39, 0.62)',
-  overlayStrong: 'rgba(17, 24, 39, 0.78)',
-  onCameraMuted: 'rgba(255, 255, 255, 0.86)',
-  scrim: '#111827',
+  overlay: 'rgba(15, 23, 42, 0.6)',
+  overlayStrong: 'rgba(15, 23, 42, 0.8)',
+  onCameraMuted: 'rgba(255, 255, 255, 0.85)',
+  scrim: '#0F172A',
 } as const;
 
-/** 4pt spacing scale. Use these instead of ad-hoc padding. */
+// ============================================================================
+// SPACING — 8-point scale
+// ============================================================================
+
 export const spacing = {
   xxs: 2,
   xs: 4,
@@ -71,110 +83,183 @@ export const spacing = {
   huge: 48,
 } as const;
 
-/** Corner radii, with a single visual language of soft, consistent rounding. */
+// ============================================================================
+// CORNER RADII — rounded level 2 (median between regulatory & modern)
+// ============================================================================
+
 export const radii = {
+  xs: 4,
   sm: 8,
-  md: 12,
+  md: 8,
   lg: 16,
-  xl: 20,
-  pill: 999,
+  xl: 24,
+  pill: 9999,
 } as const;
 
+// ============================================================================
+// TYPOGRAPHY — Plus Jakarta Sans (headings) + Inter (body)
+// ============================================================================
+
 /**
- * Type scale. System font with tightened letter spacing on large text, which is
- * what gives the app a cleaner typographic voice than the default React Native
- * rendering.
+ * Font families. Using system fonts as fallbacks since custom fonts
+ * require bundling TTF files. The design is achieved through sizing,
+ * weight, and letter-spacing specs from the design system.
+ * 
+ * For custom fonts, add TTF files to assets/fonts/ and load via expo-font.
  */
+export const fontFamily = {
+  // System font on iOS (SF Pro) and Android (Roboto) approximate Inter/Plus Jakarta Sans
+  heading: undefined, // Uses system font, weight controlled per style
+  body: undefined,    // Uses system font
+  mono: 'monospace',
+} as const;
+
 export const typography = {
+  /** Display — largest scan header (mobile). */
   display: {
-    fontSize: 32,
-    lineHeight: 38,
+    fontFamily: fontFamily.heading,
+    fontSize: 28,
+    lineHeight: 36,
     fontWeight: '700' as const,
-    letterSpacing: -0.6,
+    letterSpacing: -0.28,
   },
+  /** Title — product names, screen titles. */
   title: {
+    fontFamily: fontFamily.heading,
     fontSize: 24,
-    lineHeight: 30,
-    fontWeight: '700' as const,
-    letterSpacing: -0.4,
+    lineHeight: 32,
+    fontWeight: '600' as const,
+    letterSpacing: -0.24,
   },
+  /** Heading — section headers. */
   heading: {
+    fontFamily: fontFamily.heading,
     fontSize: 18,
     lineHeight: 24,
     fontWeight: '600' as const,
-    letterSpacing: -0.2,
+    letterSpacing: -0.18,
   },
+  /** Subheading — brand names, secondary emphasis. */
   subheading: {
-    fontSize: 15,
-    lineHeight: 21,
+    fontFamily: fontFamily.heading,
+    fontSize: 16,
+    lineHeight: 24,
     fontWeight: '600' as const,
   },
+  /** Body — primary reading text. */
   body: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontFamily: fontFamily.body,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '400' as const,
   },
+  /** Body strong — emphasized body text. */
   bodyStrong: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontFamily: fontFamily.body,
+    fontSize: 16,
+    lineHeight: 24,
     fontWeight: '600' as const,
   },
+  /** Caption — metadata, helper text. */
   caption: {
+    fontFamily: fontFamily.body,
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '400' as const,
   },
+  /** Caption strong — labelled metadata. */
   captionStrong: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontFamily: fontFamily.body,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '600' as const,
+    letterSpacing: 0.24,
   },
-  /** Uppercase micro-labels for eyebrows and badge text. */
+  /** Overline — uppercase micro-labels, eyebrows. */
   overline: {
+    fontFamily: fontFamily.body,
     fontSize: 11,
     lineHeight: 14,
-    fontWeight: '700' as const,
-    letterSpacing: 0.8,
+    fontWeight: '500' as const,
+    letterSpacing: 0.44,
     textTransform: 'uppercase' as const,
   },
-  /** Large all-caps verdict headline. */
+  /** Verdict — large all-caps safety score headline. */
   verdict: {
-    fontSize: 30,
-    lineHeight: 36,
+    fontFamily: fontFamily.heading,
+    fontSize: 36,
+    lineHeight: 44,
     fontWeight: '800' as const,
     letterSpacing: 1.2,
   },
+  /** INS / chemical codes — tabular numbers for alignment. */
+  code: {
+    fontFamily: fontFamily.mono,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600' as const,
+    letterSpacing: 0.6,
+  },
 } as const;
 
-/**
- * Subtle elevation. Two levels only: resting cards and pressed/raised controls,
- * so shadows never compete with the content.
- */
+// ============================================================================
+// ELEVATION & DEPTH — tonal separation, no heavy shadows
+// ============================================================================
+
+const shadowColor = 'rgba(30, 62, 98, 1)'; // primary with alpha
+
 export const shadows = {
   none: {},
+  /** Level 1 — resting cards & panels. */
   card: Platform.select({
     ios: {
-      shadowColor: '#0B1220',
+      shadowColor,
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
+      shadowOpacity: 0.04,
       shadowRadius: 3,
     },
     android: { elevation: 1 },
     default: {},
   }) as object,
+  /** Level 2 — active viewfinder, floating scoreboards, sticky trays. */
   raised: Platform.select({
     ios: {
-      shadowColor: '#0B1220',
-      shadowOffset: { width: 0, height: 4 },
+      shadowColor,
+      shadowOffset: { width: 0, height: 8 },
       shadowOpacity: 0.08,
-      shadowRadius: 12,
+      shadowRadius: 24,
     },
     android: { elevation: 3 },
     default: {},
   }) as object,
+  /** Level 2 alternative — with negative spread for tighter feel. */
+  raisedTight: Platform.select({
+    ios: {
+      shadowColor,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.04,
+      shadowRadius: 6,
+    },
+    android: { elevation: 2 },
+    default: {},
+  }) as object,
+  /** Level 3 — alert sheets & overlays. */
+  overlay: Platform.select({
+    ios: {
+      shadowColor,
+      shadowOffset: { width: 0, height: 16 },
+      shadowOpacity: 0.16,
+      shadowRadius: 32,
+    },
+    android: { elevation: 6 },
+    default: {},
+  }) as object,
 } as const;
 
-/** Verdict presentation, shared by the result banner and the history badges. */
+// ============================================================================
+// SEMANTIC HELPERS
+// ============================================================================
+
 export type VerdictTone = 'safe' | 'caution' | 'unsafe' | 'neutral';
 
 export function toneColors(tone: VerdictTone) {
@@ -190,7 +275,6 @@ export function toneColors(tone: VerdictTone) {
   }
 }
 
-/** Maps an engine verdict onto the tone palette. */
 export function verdictTone(verdict?: string): VerdictTone {
   switch ((verdict || '').toLowerCase()) {
     case 'unsafe':
@@ -204,5 +288,16 @@ export function verdictTone(verdict?: string): VerdictTone {
   }
 }
 
-/** Minimum touch target, so controls stay comfortably tappable. */
-export const HIT_SIZE = 44;
+export function vegColors(vegMark: 'veg' | 'non-veg' | 'unknown') {
+  switch (vegMark) {
+    case 'veg':
+      return { fg: colors.safe, bg: colors.safeSoft, border: colors.safe };
+    case 'non-veg':
+      return { fg: colors.nonVeg, bg: colors.nonVegSoft, border: colors.nonVeg };
+    default:
+      return { fg: colors.textSubtle, bg: colors.surfaceMuted, border: colors.border };
+  }
+}
+
+/** Minimum touch target — 48px for comfortable tap. */
+export const HIT_SIZE = 48;

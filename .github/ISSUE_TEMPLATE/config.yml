@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/2skyrider6/TrueLabels/security/advisories/new
+    about: Report anything that could make a product look safer than it is, privately. Please do not open a public issue.
+  - name: Contributing guide
+    url: https://github.com/2skyrider6/TrueLabels/blob/master/CONTRIBUTING.md
+    about: Read this before opening a pull request, especially for changes to the verdict path.
+  - name: Discussions
+    url: https://github.com/2skyrider6/TrueLabels/discussions
+    about: Ask questions, share a product the scanner got wrong, or propose a rule set expansion.

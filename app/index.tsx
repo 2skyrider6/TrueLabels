@@ -3,7 +3,6 @@ import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -15,10 +14,12 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCameraPermission } from '@/hooks/useCameraPermission';
 import { useResult } from '@/context/ResultContext';
+import { useHaptic } from '@/hooks/useHaptic';
 import { fetchProductByBarcode, isProductBarcode } from '@/off/client';
 import { parseIngredients } from '@/rules/parser';
 import { evaluateEngine, loadRuleset } from '@/rules/engine';
-import { Button, Callout, ScreenHeader } from '@/components/ui';
+import { Button, Callout, ScanTrigger, ScreenHeader } from '@/components/ui';
+import { AnimatedButton, FadeIn, ScaleIn, SlideUp } from '@/components/animated';
 import { HIT_SIZE, colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
 // Loaded once: the ruleset is a bundled JSON module and is validated on load.
@@ -35,6 +36,7 @@ export default function HomeScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const navigation = useRouter();
   const { setResult } = useResult();
+  const { trigger: haptic } = useHaptic();
   const insets = useSafeAreaInsets();
 
   const onCameraReady = useCallback(() => {
@@ -122,6 +124,7 @@ export default function HomeScreen() {
       if (!isProductBarcode(code)) {
         if (rejectedRef.current !== code) {
           rejectedRef.current = code;
+          haptic('warning');
           Alert.alert(
             'Not a product barcode',
             'That code is not a 8-14 digit product barcode. Scan the barcode on the pack, or use Scan Label to read the ingredients.'
@@ -131,23 +134,27 @@ export default function HomeScreen() {
       }
 
       if (scannedRef.current === code) return;
+      haptic('success');
       processBarcode(code);
     },
-    [scanning, cameraReady, processBarcode]
+    [scanning, cameraReady, processBarcode, haptic]
   );
 
   const toggleTorch = useCallback(() => {
+    haptic('selection');
     setTorchOn(prev => !prev);
-  }, []);
+  }, [haptic]);
 
   const handleManualEntry = useCallback(() => {
     const barcode = barcodeInput.trim();
     if (/^\d{8,14}$/.test(barcode)) {
+      haptic('light');
       processBarcode(barcode);
     } else {
+      haptic('error');
       Alert.alert('Invalid Barcode', 'Please enter a valid 8-14 digit barcode.');
     }
-  }, [barcodeInput, processBarcode]);
+  }, [barcodeInput, processBarcode, haptic]);
 
   const manualSubmitDisabled = scanning || !/^\d{8,14}$/.test(barcodeInput.trim());
 
@@ -158,15 +165,15 @@ export default function HomeScreen() {
           title="TrueLabels"
           subtitle="Check what is really in the pack"
           trailing={
-            <Pressable
+            <AnimatedButton
               onPress={() => navigation.push('/history')}
               accessibilityRole="button"
               accessibilityLabel="Open scan history"
               hitSlop={8}
-              style={({ pressed }) => [styles.historyButton, pressed && styles.pressed]}
+              style={styles.historyButton}
             >
               <Ionicons name="time-outline" size={18} color={colors.text} />
-            </Pressable>
+            </AnimatedButton>
           }
         />
       </View>
@@ -179,116 +186,119 @@ export default function HomeScreen() {
           </View>
         ) : hasPermission ? (
           <>
-            <View style={styles.cameraCard}>
-              <View style={styles.cameraFrame}>
-                <CameraView
-                  style={styles.cameraView}
-                  onBarcodeScanned={handleBarcodeScanned}
-                  onCameraReady={onCameraReady}
-                  enableTorch={torchOn}
-                  barcodeScannerSettings={{
-                    barcodeTypes: [
-                      'ean13',
-                      'ean8',
-                      'upc_a',
-                      'upc_e',
-                      'code128',
-                      'code39',
-                      'code93',
-                      'itf14',
-                      'codabar',
-                      'qr',
-                      'datamatrix',
-                      'pdf417',
-                      'aztec',
-                    ],
-                  }}
-                />
-
-                {/* Corner-bracket reticle, drawn over the preview. */}
-                <View style={styles.reticle} pointerEvents="none">
-                  <View style={[styles.corner, styles.cornerTopLeft]} />
-                  <View style={[styles.corner, styles.cornerTopRight]} />
-                  <View style={[styles.corner, styles.cornerBottomLeft]} />
-                  <View style={[styles.corner, styles.cornerBottomRight]} />
-                </View>
-
-                <View style={styles.viewfinderHint} pointerEvents="none">
-                  <Text style={styles.viewfinderHintText}>Align the barcode inside the frame</Text>
-                </View>
-
-                {!cameraReady && (
-                  <View style={styles.overlay}>
-                    <ActivityIndicator size="large" color={colors.onCamera} />
-                    <Text style={styles.overlayText}>Starting camera…</Text>
-                  </View>
-                )}
-
-                {scanning && (
-                  <View style={styles.overlay}>
-                    <ActivityIndicator size="large" color={colors.onCamera} />
-                    <Text style={styles.overlayText}>Looking up product…</Text>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.cameraFooter}>
-                <View style={styles.cameraStatus}>
-                  <Ionicons
-                    name={cameraReady ? 'radio-button-on' : 'radio-button-off'}
-                    size={12}
-                    color={cameraReady ? colors.safe : colors.textSubtle}
-                    style={styles.cameraStatusIcon}
+            <ScaleIn delay={100}>
+              <View style={styles.cameraCard}>
+                <View style={styles.cameraFrame}>
+                  <CameraView
+                    style={styles.cameraView}
+                    onBarcodeScanned={handleBarcodeScanned}
+                    onCameraReady={onCameraReady}
+                    enableTorch={torchOn}
+                    barcodeScannerSettings={{
+                      barcodeTypes: [
+                        'ean13',
+                        'ean8',
+                        'upc_a',
+                        'upc_e',
+                        'code128',
+                        'code39',
+                        'code93',
+                        'itf14',
+                        'codabar',
+                        'qr',
+                        'datamatrix',
+                        'pdf417',
+                        'aztec',
+                      ],
+                    }}
                   />
-                  <Text style={styles.cameraStatusText} numberOfLines={1}>
-                    {lastScannedCode ? `Last scanned ${lastScannedCode}` : 'Scanner ready'}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={toggleTorch}
-                  disabled={scanning || !cameraReady}
-                  accessibilityRole="button"
-                  accessibilityLabel="Toggle torch"
-                  accessibilityState={{ disabled: scanning || !cameraReady, selected: torchOn }}
-                  hitSlop={8}
-                  style={({ pressed }) => [
-                    styles.torchButton,
-                    torchOn && styles.torchButtonActive,
-                    (scanning || !cameraReady) && styles.disabled,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Ionicons
-                    name={torchOn ? 'flashlight' : 'flashlight-outline'}
-                    size={16}
-                    color={torchOn ? colors.textInverse : colors.textSecondary}
-                  />
-                </Pressable>
-              </View>
-            </View>
 
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Barcode number</Text>
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="8–14 digits"
-                  placeholderTextColor={colors.textSubtle}
-                  value={barcodeInput}
-                  onChangeText={setBarcodeInput}
-                  keyboardType="numeric"
-                  maxLength={14}
-                  accessibilityLabel="Barcode number"
-                />
-                <Button
-                  label="Look up"
-                  onPress={handleManualEntry}
-                  disabled={manualSubmitDisabled}
-                  fullWidth={false}
-                  style={styles.lookupButton}
-                />
+                  {/* Corner-bracket reticle, drawn over the preview. */}
+                  <View style={styles.reticle} pointerEvents="none">
+                    <View style={[styles.corner, styles.cornerTopLeft]} />
+                    <View style={[styles.corner, styles.cornerTopRight]} />
+                    <View style={[styles.corner, styles.cornerBottomLeft]} />
+                    <View style={[styles.corner, styles.cornerBottomRight]} />
+                  </View>
+
+                  <View style={styles.viewfinderHint} pointerEvents="none">
+                    <Text style={styles.viewfinderHintText}>Align the barcode inside the frame</Text>
+                  </View>
+
+                  {!cameraReady && (
+                    <View style={styles.overlay}>
+                      <ActivityIndicator size="large" color={colors.onCamera} />
+                      <Text style={styles.overlayText}>Starting camera…</Text>
+                    </View>
+                  )}
+
+                  {scanning && (
+                    <View style={styles.overlay}>
+                      <ActivityIndicator size="large" color={colors.onCamera} />
+                      <Text style={styles.overlayText}>Looking up product…</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.cameraFooter}>
+                  <View style={styles.cameraStatus}>
+                    <Ionicons
+                      name={cameraReady ? 'radio-button-on' : 'radio-button-off'}
+                      size={12}
+                      color={cameraReady ? colors.safe : colors.textSubtle}
+                      style={styles.cameraStatusIcon}
+                    />
+                    <Text style={styles.cameraStatusText} numberOfLines={1}>
+                      {lastScannedCode ? `Last scanned ${lastScannedCode}` : 'Scanner ready'}
+                    </Text>
+                  </View>
+                  <AnimatedButton
+                    onPress={toggleTorch}
+                    disabled={scanning || !cameraReady}
+                    accessibilityRole="button"
+                    accessibilityLabel="Toggle torch"
+                    accessibilityState={{ disabled: scanning || !cameraReady, selected: torchOn }}
+                    hitSlop={8}
+                    style={[
+                      styles.torchButton,
+                      torchOn && styles.torchButtonActive,
+                      (scanning || !cameraReady) && styles.disabled,
+                    ]}
+                  >
+                    <Ionicons
+                      name={torchOn ? 'flashlight' : 'flashlight-outline'}
+                      size={16}
+                      color={torchOn ? colors.textInverse : colors.textSecondary}
+                    />
+                  </AnimatedButton>
+                </View>
               </View>
-            </View>
+            </ScaleIn>
+
+            <FadeIn delay={150}>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Barcode number</Text>
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="8–14 digits"
+                    placeholderTextColor={colors.textSubtle}
+                    value={barcodeInput}
+                    onChangeText={setBarcodeInput}
+                    keyboardType="numeric"
+                    maxLength={14}
+                    accessibilityLabel="Barcode number"
+                  />
+                  <Button
+                    label="Look up"
+                    onPress={handleManualEntry}
+                    disabled={manualSubmitDisabled}
+                    fullWidth={false}
+                    style={styles.lookupButton}
+                  />
+                </View>
+              </View>
+            </FadeIn>
           </>
         ) : (
           <Callout tone="warning" title="Camera access denied" icon="lock-closed-outline">
@@ -306,52 +316,44 @@ export default function HomeScreen() {
         )}
 
         {/* Alternate entry points. */}
-        <View style={styles.altGroup}>
-          <Text style={styles.altHeading}>Or check by label</Text>
-          <Pressable
-            onPress={() => navigation.push('/label-scan')}
-            disabled={!hasPermission || scanning}
-            accessibilityRole="button"
-            accessibilityLabel="Scan a food label using the camera and OCR"
-            accessibilityState={{ disabled: !hasPermission || scanning }}
-            style={({ pressed }) => [
-              styles.altButton,
-              (!hasPermission || scanning) && styles.altButtonDisabled,
-              pressed && styles.pressed,
-            ]}
-          >
-            <View style={styles.altIcon}>
-              <Ionicons name="camera-outline" size={20} color={colors.primary} />
-            </View>
-            <View style={styles.altBody}>
-              <Text style={styles.altTitle}>Scan label</Text>
-              <Text style={styles.altSubtitle}>Photograph the ingredient panel and read it</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textSubtle} />
-          </Pressable>
+        <SlideUp delay={200}>
+          <View style={styles.altGroup}>
+            <Text style={styles.altHeading}>Or check by label</Text>
 
-          <Pressable
-            onPress={() => navigation.push('/paste')}
-            disabled={scanning}
-            accessibilityRole="button"
-            accessibilityLabel="Paste ingredients text"
-            accessibilityState={{ disabled: scanning }}
-            style={({ pressed }) => [
-              styles.altButton,
-              scanning && styles.altButtonDisabled,
-              pressed && styles.pressed,
-            ]}
-          >
-            <View style={styles.altIcon}>
-              <Ionicons name="clipboard-outline" size={20} color={colors.primary} />
+            {/* Label capture is the affordance that most users need, so it
+                carries the design system's circular scan trigger rather than a
+                full-width row. */}
+            <View style={styles.scanTriggerRow}>
+              <ScanTrigger
+                onPress={() => navigation.push('/label-scan')}
+                accessibilityLabel="Scan a food label using the camera and OCR"
+                disabled={!hasPermission || scanning}
+              />
+              <View style={styles.scanTriggerBody}>
+                <Text style={styles.altTitle}>Scan label</Text>
+                <Text style={styles.altSubtitle}>Photograph the ingredient panel and read it</Text>
+              </View>
             </View>
-            <View style={styles.altBody}>
-              <Text style={styles.altTitle}>Type ingredients</Text>
-              <Text style={styles.altSubtitle}>Paste the text when a photo is not readable</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textSubtle} />
-          </Pressable>
-        </View>
+
+            <AnimatedButton
+              onPress={() => navigation.push('/paste')}
+              disabled={scanning}
+              accessibilityRole="button"
+              accessibilityLabel="Paste ingredients text"
+              accessibilityState={{ disabled: scanning }}
+              style={[styles.altButton, scanning && styles.altButtonDisabled]}
+            >
+              <View style={styles.altIcon}>
+                <Ionicons name="clipboard-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.altBody}>
+                <Text style={styles.altTitle}>Type ingredients</Text>
+                <Text style={styles.altSubtitle}>Paste the text when a photo is not readable</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textSubtle} />
+            </AnimatedButton>
+          </View>
+        </SlideUp>
       </View>
     </View>
   );
@@ -390,7 +392,9 @@ const styles = StyleSheet.create({
   cameraView: { flex: 1 },
 
   reticle: { position: 'absolute', top: '26%', left: '14%', right: '14%', height: '48%' },
-  corner: { position: 'absolute', width: 26, height: 26, borderColor: colors.onCamera },
+  // Corner brackets in the safety green from the design system, so the
+  // viewfinder reads as the active capture surface.
+  corner: { position: 'absolute', width: 26, height: 26, borderColor: colors.safe },
   cornerTopLeft: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 6 },
   cornerTopRight: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 6 },
   cornerBottomLeft: {
@@ -478,6 +482,8 @@ const styles = StyleSheet.create({
 
   altGroup: { gap: spacing.sm },
   altHeading: { ...typography.overline, color: colors.textSubtle, marginBottom: spacing.xxs },
+  scanTriggerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  scanTriggerBody: { flex: 1 },
   altButton: {
     flexDirection: 'row',
     alignItems: 'center',

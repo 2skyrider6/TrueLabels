@@ -1,26 +1,24 @@
 import { useState } from 'react';
-import {
-  Image,
-  Linking,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useResult } from '@/context/ResultContext';
+import { useHaptic } from '@/hooks/useHaptic';
 import {
+  AdditivePill,
   Badge,
   Button,
   Callout,
   Card,
   Chip,
+  DietaryBadge,
+  ProductSafetyCard,
+  SafetyMeter,
   SectionHeading,
 } from '@/components/ui';
+import { AnimatedButton, SlideUp, ScaleIn } from '@/components/animated';
 import { colors, radii, shadows, spacing, toneColors, typography } from '@/theme/tokens';
-import { presentVerdict } from '@/ai/merge';
+import { presentVerdict, safetyScore } from '@/ai/merge';
 
 /** Icon per verdict, so the outcome is recognisable before the word is read. */
 const VERDICT_ICON = {
@@ -30,9 +28,26 @@ const VERDICT_ICON = {
   neutral: 'help-circle' as const,
 };
 
+/**
+ * Pulls an INS code out of an additive flag's label, e.g. "INS 330 · Citric
+ * Acid" -> code "INS 330", descriptor "Citric Acid".
+ *
+ * Returns null when the label carries no code, in which case the flag is
+ * rendered as an ordinary row rather than a misleading monospace pill.
+ */
+function parseIns(label: string): { code: string; descriptor: string } | null {
+  const match = /^(INS\s*\d+[a-z]?)\s*(?:[·\-–:]\s*(.+))?$/i.exec(label.trim());
+  if (!match) return null;
+  return {
+    code: match[1].replace(/\s+/g, ' ').trim(),
+    descriptor: (match[2] ?? 'Additive').trim(),
+  };
+}
+
 export default function ResultScreen() {
   const { result } = useResult();
   const navigation = useRouter();
+  const { trigger: haptic } = useHaptic();
   const [expandedFlag, setExpandedFlag] = useState<string | null>(null);
 
   if (!result) {
@@ -83,6 +98,16 @@ export default function ResultScreen() {
   const declared = result.parsed.declaredAllergens;
   const mayContain = result.parsed.mayContain;
 
+  // Derived presentation score. The verdict above remains authoritative; the
+  // meter only visualises it, and `safetyScore` holds an unreadable or
+  // unverified label in the critical band so it can never read as a pass.
+  const score = safetyScore({
+    verdict: result.verdict,
+    coverage,
+    insufficientData: unreadable,
+    flagCount: result.flags.length,
+  });
+
   return (
     <ScrollView
       style={styles.container}
@@ -90,73 +115,67 @@ export default function ResultScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Verdict hero. The single strongest element on the screen. */}
-      <View style={[styles.hero, { backgroundColor: palette.bg, borderColor: palette.border }]}>
-        <View style={[styles.heroIcon, { backgroundColor: palette.fg }]}>
-          <Ionicons name={VERDICT_ICON[tone]} size={26} color={colors.textInverse} />
-        </View>
-        <Text style={[styles.heroTitle, { color: palette.fg }]} accessibilityRole="header">
-          {verdictTitle}
-        </Text>
-        <Text style={styles.heroMessage}>{verdictMessage}</Text>
-
-        {!unverified && (
-          <View style={styles.heroStats}>
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>{declared.length}</Text>
-              <Text style={styles.heroStatLabel}>Declared</Text>
-            </View>
-            <View style={styles.heroStatDivider} />
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>{result.flags.length}</Text>
-              <Text style={styles.heroStatLabel}>Flags</Text>
-            </View>
-            <View style={styles.heroStatDivider} />
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>{mayContain.length}</Text>
-              <Text style={styles.heroStatLabel}>May contain</Text>
-            </View>
+      <ScaleIn delay={0}>
+        <View style={[styles.hero, { backgroundColor: palette.bg, borderColor: palette.border }]}>
+          <View style={[styles.heroIcon, { backgroundColor: palette.fg }]}>
+            <Ionicons name={VERDICT_ICON[tone]} size={26} color={colors.textInverse} />
           </View>
-        )}
-      </View>
+          <Text style={[styles.heroTitle, { color: palette.fg }]} accessibilityRole="header">
+            {verdictTitle}
+          </Text>
+          <Text style={styles.heroMessage}>{verdictMessage}</Text>
+
+          {/* Safety meter. The score is only shown once the verdict is trusted,
+              so a NOT VERIFIED label never displays a number that reads as a
+              clean bill of health. */}
+          {!unverified && (
+            <View style={styles.heroMeter}>
+              <SafetyMeter score={score} height={10} />
+            </View>
+          )}
+
+          {!unverified && (
+            <View style={styles.heroStats}>
+              <View style={styles.heroStat}>
+                <Text style={styles.heroStatValue}>{declared.length}</Text>
+                <Text style={styles.heroStatLabel}>Declared</Text>
+              </View>
+              <View style={styles.heroStatDivider} />
+              <View style={styles.heroStat}>
+                <Text style={styles.heroStatValue}>{result.flags.length}</Text>
+                <Text style={styles.heroStatLabel}>Flags</Text>
+              </View>
+              <View style={styles.heroStatDivider} />
+              <View style={styles.heroStat}>
+                <Text style={styles.heroStatValue}>{mayContain.length}</Text>
+                <Text style={styles.heroStatLabel}>May contain</Text>
+              </View>
+            </View>
+          )}
+        </View>
+      </ScaleIn>
 
       <View style={styles.content}>
         {/* Product identity */}
-        {(result.productName || result.barcode || result.imageUrl) && (
-          <Card style={styles.productCard}>
-            {result.imageUrl ? (
-              <Image
-                source={{ uri: result.imageUrl }}
-                style={styles.productImage}
-                accessibilityLabel={result.productName || 'Product image'}
+        <SlideUp delay={100}>
+          {(result.productName || result.barcode || result.imageUrl) && (
+            <ProductSafetyCard
+              score={unverified ? undefined : score}
+              title={result.productName || 'Unnamed product'}
+              brand={result.brands}
+              imageUrl={result.imageUrl}
+              vegMark={result.vegMark}
+              barcode={result.barcode}
+            >
+              <Badge
+                label={sourceLabel(result.source)}
+                fg={colors.textSecondary}
+                bg={colors.surfaceSunken}
+                border={colors.border}
               />
-            ) : (
-              <View style={[styles.productImage, styles.productImagePlaceholder]}>
-                <Ionicons name="cube-outline" size={22} color={colors.textSubtle} />
-              </View>
-            )}
-            <View style={styles.productDetails}>
-              <Text style={styles.productTitle} numberOfLines={2}>
-                {result.productName || 'Unnamed product'}
-              </Text>
-              {result.brands ? (
-                <Text style={styles.productBrand} numberOfLines={1}>
-                  {result.brands}
-                </Text>
-              ) : null}
-              <View style={styles.productMetaRow}>
-                <Badge
-                  label={sourceLabel(result.source)}
-                  fg={colors.textSecondary}
-                  bg={colors.surfaceSunken}
-                  border={colors.border}
-                />
-                {result.barcode ? (
-                  <Text style={styles.productBarcode}>{result.barcode}</Text>
-                ) : null}
-              </View>
-            </View>
-          </Card>
-        )}
+            </ProductSafetyCard>
+          )}
+        </SlideUp>
 
         {unreadable && (
           <Callout tone="warning" icon="alert-circle" title="Treat this result as unknown">
@@ -175,114 +194,129 @@ export default function ResultScreen() {
         )}
 
         {/* Declared allergens. The most safety-critical block, so it comes first. */}
-        {declared.length > 0 && (
-          <View style={styles.section}>
-            <SectionHeading
-              eyebrow="From the pack"
-              title="Allergens Declared"
-              icon="alert-circle-outline"
-              trailing={
-                <Badge
-                  label={String(declared.length)}
-                  fg={palette.fg}
-                  bg={palette.bg}
-                  border={palette.border}
-                />
-              }
-            />
-            <Card>
-              <View style={styles.chipWrap}>
-                {declared.map((item) => (
-                  <Chip
-                    key={item}
-                    label={item}
-                    fg={colors.danger}
-                    bg={colors.dangerSoft}
-                    border={colors.dangerBorder}
+        <SlideUp delay={150}>
+          {declared.length > 0 && (
+            <View style={styles.section}>
+              <SectionHeading
+                eyebrow="From the pack"
+                title="Allergens Declared"
+                icon="alert-circle-outline"
+                trailing={
+                  <Badge
+                    label={String(declared.length)}
+                    fg={palette.fg}
+                    bg={palette.bg}
+                    border={palette.border}
                   />
-                ))}
-              </View>
-              <Text style={styles.sectionNote}>
-                The manufacturer declares these as present in the product.
-              </Text>
-            </Card>
-          </View>
-        )}
+                }
+              />
+              <Card>
+                <View style={styles.chipWrap}>
+                  {declared.map((item) => (
+                    <Chip
+                      key={item}
+                      label={item}
+                      fg={colors.danger}
+                      bg={colors.dangerSoft}
+                      border={colors.dangerBorder}
+                    />
+                  ))}
+                </View>
+                <Text style={styles.sectionNote}>
+                  The manufacturer declares these as present in the product.
+                </Text>
+              </Card>
+            </View>
+          )}
+        </SlideUp>
 
         {/* Why the verdict landed where it did */}
-        <View style={styles.section}>
-          <SectionHeading
-            eyebrow="Analysis"
-            title="What Drove the Verdict"
-            icon="analytics-outline"
-          />
-          <Card padded={false}>
-            {result.flags.length > 0 ? (
-              result.flags.map((flag, index) => {
-                const expanded = expandedFlag === flag.id;
-                const flagTone = toneColors(flag.severity === 'unsafe' ? 'unsafe' : 'caution');
-                return (
-                  <Pressable
-                    key={flag.id}
-                    onPress={() => setExpandedFlag(expanded ? null : flag.id)}
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded }}
-                    accessibilityLabel={`${flag.label}, ${flag.severity}. ${
-                      expanded ? 'Hide details' : 'Show details'
-                    }`}
-                    style={({ pressed }) => [
-                      styles.flagRow,
-                      index > 0 && styles.flagRowDivider,
-                      pressed && styles.flagRowPressed,
-                    ]}
-                  >
-                    <View style={styles.flagRowHeader}>
-                      <View style={[styles.flagDot, { backgroundColor: flagTone.fg }]} />
-                      <Text style={styles.flagLabel}>{flag.label}</Text>
-                      <Badge
-                        label={flag.severity}
-                        fg={flagTone.fg}
-                        bg={flagTone.bg}
-                        border={flagTone.border}
-                      />
-                      <Ionicons
-                        name={expanded ? 'chevron-up' : 'chevron-down'}
-                        size={16}
-                        color={colors.textSubtle}
-                      />
-                    </View>
-                    {flag.crossContamination ? (
-                      <View style={styles.flagTagRow}>
+        <SlideUp delay={200}>
+          <View style={styles.section}>
+            <SectionHeading
+              eyebrow="Analysis"
+              title="What Drove the Verdict"
+              icon="analytics-outline"
+            />
+            <Card padded={false}>
+              {result.flags.length > 0 ? (
+                result.flags.map((flag, index) => {
+                  const expanded = expandedFlag === flag.id;
+                  const flagTone = toneColors(flag.severity === 'unsafe' ? 'unsafe' : 'caution');
+                  // Additive flags that carry an INS code get the monospace
+                  // pill treatment; everything else stays an ordinary row.
+                  const ins = flag.category === 'additive' ? parseIns(flag.label) : null;
+                  const pillTone = flag.severity === 'unsafe' ? 'unsafe' : 'caution';
+                  return (
+                    <AnimatedButton
+                      key={flag.id}
+                      onPress={() => {
+                        haptic('selection');
+                        setExpandedFlag(expanded ? null : flag.id);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded }}
+                      accessibilityLabel={`${flag.label}, ${flag.severity}. ${
+                        expanded ? 'Hide details' : 'Show details'
+                      }`}
+                      style={[styles.flagRow, index > 0 && styles.flagRowDivider]}
+                    >
+                      <View style={styles.flagRowHeader}>
+                        <View style={[styles.flagDot, { backgroundColor: flagTone.fg }]} />
+                        {ins ? (
+                          <AdditivePill
+                            code={ins.code}
+                            descriptor={ins.descriptor}
+                            tone={pillTone}
+                          />
+                        ) : (
+                          <Text style={styles.flagLabel}>{flag.label}</Text>
+                        )}
                         <Badge
-                          label="Cross-contamination"
-                          icon="git-branch-outline"
-                          fg={colors.primary}
-                          bg={colors.primarySoft}
-                          border={colors.primaryBorder}
+                          label={flag.severity}
+                          fg={flagTone.fg}
+                          bg={flagTone.bg}
+                          border={flagTone.border}
+                        />
+                        <Ionicons
+                          name={expanded ? 'chevron-up' : 'chevron-down'}
+                          size={16}
+                          color={colors.textSubtle}
                         />
                       </View>
-                    ) : null}
-                    {expanded ? <Text style={styles.flagReason}>{flag.reason}</Text> : null}
-                  </Pressable>
-                );
-              })
-            ) : (
-              <View style={styles.flagEmpty}>
-                <Ionicons
-                  name="checkmark-circle-outline"
-                  size={18}
-                  color={unreadable ? colors.textSubtle : colors.safe}
-                  style={styles.flagEmptyIcon}
-                />
-                <Text style={[styles.flagEmptyText, unreadable && styles.flagEmptyTextMuted]}>
-                  {unreadable
-                    ? 'Nothing to analyse — the label was not read'
-                    : 'No triggering ingredients found'}
-                </Text>
-              </View>
-            )}
-          </Card>
-        </View>
+                      {flag.crossContamination ? (
+                        <View style={styles.flagTagRow}>
+                          <Badge
+                            label="Cross-contamination"
+                            icon="git-branch-outline"
+                            fg={colors.primary}
+                            bg={colors.primarySoft}
+                            border={colors.primaryBorder}
+                          />
+                        </View>
+                      ) : null}
+                      {expanded ? <Text style={styles.flagReason}>{flag.reason}</Text> : null}
+                    </AnimatedButton>
+                  );
+                })
+              ) : (
+                <View style={styles.flagEmpty}>
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={18}
+                    color={unreadable ? colors.textSubtle : colors.safe}
+                    style={styles.flagEmptyIcon}
+                  />
+                  <Text style={[styles.flagEmptyText, unreadable && styles.flagEmptyTextMuted]}>
+                    {unreadable
+                      ? 'Nothing to analyse — the label was not read'
+                      : 'No triggering ingredients found'}
+                  </Text>
+                </View>
+              )}
+            </Card>
+          </View>
+        </SlideUp>
 
         {/* Traces */}
         <View style={styles.section}>
@@ -318,11 +352,25 @@ export default function ResultScreen() {
         {/* Veg mark: stated plainly rather than presented as an empty result. */}
         <View style={styles.section}>
           <SectionHeading eyebrow="Pack marking" title="Veg / Non-Veg Mark" icon="leaf-outline" />
-          <Callout tone="neutral" icon="leaf-outline">
-            Not analysed. Reading the green or brown veg mark needs on-device image
-            recognition this app does not perform, so nothing is inferred from the photo. The
-            ingredient analysis above is the authoritative signal.
-          </Callout>
+          <Card>
+            <View style={styles.vegRow}>
+              <DietaryBadge mark={result.vegMark} />
+              <View style={styles.vegBody}>
+                <Text style={styles.vegTitle}>
+                  {result.vegMark === 'veg'
+                    ? 'Vegetarian mark detected'
+                    : result.vegMark === 'non-veg'
+                      ? 'Non-vegetarian mark detected'
+                      : 'Mark not analysed'}
+                </Text>
+                <Text style={styles.vegNote}>
+                  Not analysed. Reading the green or brown veg mark needs on-device image
+                  recognition this app does not perform, so nothing is inferred from the photo.
+                  The ingredient analysis above is the authoritative signal.
+                </Text>
+              </View>
+            </View>
+          </Card>
         </View>
 
         {/* Verbatim source text */}
@@ -360,15 +408,17 @@ export default function ResultScreen() {
           allergen requirements.
         </Callout>
 
-        <View style={styles.actions}>
-          <Button label="Scan another item" icon="scan-outline" onPress={() => navigation.replace('/')} />
-          <Button
-            label="View history"
-            variant="secondary"
-            icon="time-outline"
-            onPress={() => navigation.push('/history')}
-          />
-        </View>
+        <SlideUp delay={300}>
+          <View style={styles.actions}>
+            <Button label="Scan another item" icon="scan-outline" onPress={() => navigation.replace('/')} />
+            <Button
+              label="View history"
+              variant="secondary"
+              icon="time-outline"
+              onPress={() => navigation.push('/history')}
+            />
+          </View>
+        </SlideUp>
       </View>
     </ScrollView>
   );
@@ -438,26 +488,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xs,
   },
-  heroBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    gap: spacing.xs,
+  heroMeter: {
+    alignSelf: 'stretch',
     marginTop: spacing.lg,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  heroBadgeText: {
-    ...typography.captionStrong,
-  },
-  disclosureBody: {
-    ...typography.caption,
-    color: colors.textMuted,
-    marginTop: spacing.xs,
   },
   heroStats: {
     flexDirection: 'row',
@@ -466,7 +499,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     alignSelf: 'stretch',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(17,24,39,0.08)',
+    borderTopColor: 'rgba(30, 62, 98, 0.10)',
   },
   heroStat: { flex: 1, alignItems: 'center' },
   heroStatValue: { ...typography.title, color: colors.text },
@@ -475,34 +508,14 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: spacing.xxs,
   },
-  heroStatDivider: { width: 1, height: 28, backgroundColor: 'rgba(17,24,39,0.08)' },
+  heroStatDivider: { width: 1, height: 28, backgroundColor: 'rgba(30, 62, 98, 0.10)' },
 
   content: { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.xl },
 
-  productCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
-  productImage: {
-    width: 60,
-    height: 60,
-    borderRadius: radii.md,
-    backgroundColor: colors.surfaceSunken,
-    resizeMode: 'contain',
-  },
-  productImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  productDetails: { flex: 1 },
-  productTitle: { ...typography.subheading, color: colors.text },
-  productBrand: { ...typography.caption, color: colors.textMuted, marginTop: 1 },
-  productMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-    flexWrap: 'wrap',
-  },
-  productBarcode: {
-    ...typography.caption,
-    color: colors.textSubtle,
-    fontVariant: ['tabular-nums'],
-  },
+  vegRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  vegBody: { flex: 1, gap: spacing.xxs },
+  vegTitle: { ...typography.bodyStrong, color: colors.text },
+  vegNote: { ...typography.caption, color: colors.textMuted, lineHeight: 18 },
 
   section: { gap: 0 },
 

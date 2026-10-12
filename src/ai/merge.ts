@@ -83,3 +83,44 @@ export function shouldSuppressSafeVerdict(scan: {
 }): boolean {
   return scan.verdict === 'safe' && !presentVerdict(scan.verdict, scan.coverage, scan.insufficientData).verdictTrusted;
 }
+
+/**
+ * The 0-100 score the SafetyMeter renders.
+ *
+ * This is presentation only. `presentVerdict` remains the single gate that
+ * decides whether a result may look clean, and the verdict remains the
+ * authoritative signal — the meter never overrides an UNSAFE the engine raised.
+ *
+ * Two properties are load-bearing and must not be relaxed:
+ *
+ * 1. A label that could not be read, or could not be read *in a language the
+ *    rule set covers*, can never score as safe. Missing ingredient text is not
+ *    a clean bill of health, so both are held in the critical band.
+ * 2. The band boundaries match the meter's own colour zones, so the score can
+ *    never render green while the verdict reads UNSAFE or NOT VERIFIED.
+ */
+export function safetyScore(input: {
+  verdict: Verdict;
+  coverage: Coverage;
+  insufficientData: boolean;
+  /** Number of flags the engine raised. More flags strictly lower the score. */
+  flagCount: number;
+}): number {
+  const { verdict, coverage, insufficientData, flagCount } = input;
+
+  // Nothing was read at all: the meter has nothing to report.
+  if (insufficientData) return 0;
+
+  // Critical band: 0-39, rendered red by the meter.
+  const critical = Math.max(8, 32 - flagCount * 2);
+  // Moderate band: 40-69, rendered amber.
+  const moderate = Math.min(68, 55 + flagCount);
+  // Pure band: 70-100, rendered green.
+  const pure = Math.max(70, 96 - flagCount * 2);
+
+  // An unreadable-language label and a real UNSAFE are both critical, so a
+  // "safe" verdict that the pipeline could not verify never lands in green.
+  if (coverage === 'unverified' || verdict === 'unsafe') return critical;
+  if (verdict === 'caution') return moderate;
+  return pure;
+}

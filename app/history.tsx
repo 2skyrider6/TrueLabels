@@ -3,10 +3,13 @@ import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View }
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useResult } from '@/context/ResultContext';
+import { useHaptic } from '@/hooks/useHaptic';
 import { deleteScan, getScanById, clearHistory, HistoryScan } from '@/db/history';
 import { Flag, ParsedIngredients, ScanResult, Verdict } from '@/rules/types';
-import { Badge, Button, EmptyState } from '@/components/ui';
+import { Badge, Button, EmptyState, ScoreRing } from '@/components/ui';
+import { AnimatedButton, SlideUp } from '@/components/animated';
 import { colors, radii, shadows, spacing, toneColors, typography, verdictTone } from '@/theme/tokens';
+import { safetyScore } from '@/ai/merge';
 
 function parseJsonArray<T>(value: string | undefined, fallback: T[]): T[] {
   if (!value) return fallback;
@@ -28,6 +31,7 @@ const VERDICT_ICON = {
 export default function HistoryScreen() {
   const { scans, hasMore, refreshScans, loadMore, setResult } = useResult();
   const navigation = useRouter();
+  const { trigger: haptic } = useHaptic();
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const handleDelete = useCallback(
@@ -38,6 +42,7 @@ export default function HistoryScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
+            haptic('warning');
             setDeletingId(id);
             try {
               deleteScan(id);
@@ -52,7 +57,7 @@ export default function HistoryScreen() {
         },
       ]);
     },
-    [refreshScans]
+    [refreshScans, haptic]
   );
 
   const handleClearAll = useCallback(() => {
@@ -62,6 +67,7 @@ export default function HistoryScreen() {
         text: 'Clear All',
         style: 'destructive',
         onPress: () => {
+          haptic('warning');
           try {
             clearHistory();
             refreshScans();
@@ -72,7 +78,7 @@ export default function HistoryScreen() {
         },
       },
     ]);
-  }, [refreshScans]);
+  }, [refreshScans, haptic]);
 
   const handleViewScan = useCallback(
     (id: number) => {
@@ -133,65 +139,88 @@ export default function HistoryScreen() {
     });
   };
 
-  const renderScan = ({ item: scan }: { item: HistoryScan }) => {
+  const renderScan = ({ item: scan, index }: { item: HistoryScan; index: number }) => {
     // An unreadable scan must never look like a clean green result in the list.
     const tone = verdictTone(scan.insufficientData ? 'unknown' : scan.verdict);
     const palette = toneColors(tone);
     const title = scan.productName || 'Unknown product';
+    // Coverage defaults to unverified, matching the read path: a row whose
+    // coverage could not be established must not score as a pass either.
+    const coverage = scan.coverage ?? 'unverified';
+    const flagCount = parseJsonArray<Flag>(scan.flagsJson, []).length;
 
     return (
-      <Pressable
-        onPress={() => handleViewScan(scan.id)}
-        accessibilityRole="button"
-        accessibilityLabel={`Open scan: ${title}, ${
-          scan.insufficientData ? 'not read' : scan.verdict
-        }, ${formatDate(scan.createdAt)}`}
-        style={({ pressed }) => [styles.scanCard, pressed && styles.scanCardPressed]}
-      >
-        <View style={[styles.verdictStripe, { backgroundColor: palette.fg }]} />
+      <SlideUp delay={Math.min(index * 50, 300)}>
+        <AnimatedButton
+          onPress={() => handleViewScan(scan.id)}
+          accessibilityRole="button"
+          accessibilityLabel={`Open scan: ${title}, ${
+            scan.insufficientData ? 'not read' : scan.verdict
+          }, ${formatDate(scan.createdAt)}`}
+          style={styles.scanCard}
+        >
+          <View style={[styles.verdictStripe, { backgroundColor: palette.fg }]} />
 
-        <View style={styles.scanBody}>
-          <View style={styles.scanHeaderRow}>
-            <Text style={styles.scanProductName} numberOfLines={1}>
-              {title}
-            </Text>
-            <Badge
-              label={scan.insufficientData ? 'Not read' : scan.verdict || 'unknown'}
-              icon={scan.insufficientData ? 'help' : VERDICT_ICON[tone]}
-              fg={palette.fg}
-              bg={palette.bg}
-              border={palette.border}
+          <View style={styles.scanBody}>
+            <View style={styles.scanHeaderRow}>
+              <Text style={styles.scanProductName} numberOfLines={1}>
+                {title}
+              </Text>
+              <Badge
+                label={scan.insufficientData ? 'Not read' : scan.verdict || 'unknown'}
+                icon={scan.insufficientData ? 'help' : VERDICT_ICON[tone]}
+                fg={palette.fg}
+                bg={palette.bg}
+                border={palette.border}
+              />
+            </View>
+
+            <View style={styles.scanMetaRow}>
+              <Ionicons name="time-outline" size={12} color={colors.textSubtle} style={styles.metaIcon} />
+              <Text style={styles.scanDate} numberOfLines={1}>
+                {formatDate(scan.createdAt)}
+              </Text>
+              <View style={styles.metaDot} />
+              <Text style={styles.scanSource} numberOfLines={1}>
+                {scan.barcode ? scan.barcode : sourceLabel(scan.source)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Score ring summarises the scan without opening it. It inherits the
+              same band rules as the result screen, so an unreadable or
+              unverified scan never shows a green ring here. */}
+          <View style={styles.scanRingSlot}>
+            <ScoreRing
+              score={safetyScore({
+                verdict: (scan.verdict || 'safe') as Verdict,
+                coverage,
+                insufficientData: !!scan.insufficientData,
+                flagCount,
+              })}
+              size={44}
+              thickness={4}
+              accessibilityLabel={`Score for ${title}`}
             />
           </View>
 
-          <View style={styles.scanMetaRow}>
-            <Ionicons name="time-outline" size={12} color={colors.textSubtle} style={styles.metaIcon} />
-            <Text style={styles.scanDate} numberOfLines={1}>
-              {formatDate(scan.createdAt)}
-            </Text>
-            <View style={styles.metaDot} />
-            <Text style={styles.scanSource} numberOfLines={1}>
-              {scan.barcode ? scan.barcode : sourceLabel(scan.source)}
-            </Text>
-          </View>
-        </View>
-
-        <Pressable
-          onPress={() => handleDelete(scan.id)}
-          disabled={deletingId === scan.id}
-          accessibilityRole="button"
-          accessibilityLabel={`Delete scan of ${title}`}
-          accessibilityState={{ disabled: deletingId === scan.id }}
-          hitSlop={10}
-          style={({ pressed }) => [styles.deleteButton, pressed && styles.deleteButtonPressed]}
-        >
-          {deletingId === scan.id ? (
-            <ActivityIndicator size="small" color={colors.textSubtle} />
-          ) : (
-            <Ionicons name="trash-outline" size={17} color={colors.textSubtle} />
-          )}
-        </Pressable>
-      </Pressable>
+          <AnimatedButton
+            onPress={() => handleDelete(scan.id)}
+            disabled={deletingId === scan.id}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete scan of ${title}`}
+            accessibilityState={{ disabled: deletingId === scan.id }}
+            hitSlop={10}
+            style={styles.deleteButton}
+          >
+            {deletingId === scan.id ? (
+              <ActivityIndicator size="small" color={colors.textSubtle} />
+            ) : (
+              <Ionicons name="trash-outline" size={17} color={colors.textSubtle} />
+            )}
+          </AnimatedButton>
+        </AnimatedButton>
+      </SlideUp>
     );
   };
 
@@ -315,6 +344,12 @@ const styles = StyleSheet.create({
   scanCardPressed: { backgroundColor: colors.surfaceSunken },
   // Colour-coded left edge communicates the verdict without adding a chip.
   verdictStripe: { width: 4 },
+  scanRingSlot: {
+    width: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingRight: spacing.sm,
+  },
   scanBody: { flex: 1, padding: spacing.lg, gap: spacing.sm },
   scanHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   scanProductName: { ...typography.subheading, color: colors.text, flex: 1 },

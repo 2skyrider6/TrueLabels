@@ -20,7 +20,7 @@ import {
   navigatedTo,
 } from '@test/fakes/environment';
 import { renderWithResult } from '@test/render';
-import LabelScanScreen from './label-scan';
+import LabelScanScreen from '../../app/label-scan';
 
 const takePhoto = () => screen.getByRole('button', { name: 'Take photo' });
 const readText = () => screen.getByRole('button', { name: 'Read text' });

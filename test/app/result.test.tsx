@@ -10,7 +10,7 @@ import React from 'react';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { alerts, navigatedTo, router } from '@test/fakes/environment';
 import { renderWithObservedResult } from '@test/render';
-import ResultScreen from './result';
+import ResultScreen from '../../app/result';
 import { colors } from '@/theme/tokens';
 import type { Flag, ScanResult } from '@/rules/types';
 
@@ -52,6 +52,10 @@ function result(over: Partial<ScanResult> = {}): ScanResult {
     createdAt: '2026-01-15T09:00:00.000Z',
     rulesetVersion: '2.1.0',
     insufficientData: false,
+    // The label is one the rule set could read. Without this the screen
+    // defaults coverage to 'unverified', which suppresses a trusted verdict —
+    // so a fixture describing a normal readable label has to say so.
+    coverage: 'verified',
     ...over,
   };
 }

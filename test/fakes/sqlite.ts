@@ -212,6 +212,26 @@ export class FakeSqliteDatabase {
       return;
     }
 
+    // The coverage backfill in migration 4 is the only UPDATE the schema uses,
+    // and it is written as a CASE expression over a flag column rather than a
+    // literal assignment. The fake evaluates that one form: parsing arbitrary
+    // SQL would only make the fake a second implementation of SQLite.
+    const update = /^UPDATE (\w+)\s+SET\s+(\w+)\s*=\s*CASE\s+WHEN\s+(\w+)\s*=\s*(\d+)\s+THEN\s+'([^']*)'\s+ELSE\s+'([^']*)'\s+END\s*;?$/i.exec(
+      trimmed
+    );
+    if (update) {
+      const table = this.table(update[1]);
+      const column = update[2];
+      const flagColumn = update[3];
+      const flagValue = Number(update[4]);
+      const whenSet = update[5];
+      const otherwiseSet = update[6];
+      for (const row of table.rows) {
+        row[column] = Number(row[flagColumn]) === flagValue ? whenSet : otherwiseSet;
+      }
+      return;
+    }
+
     throw new Error(`FakeSqliteDatabase: unsupported DDL: ${sql}`);
   }
 }

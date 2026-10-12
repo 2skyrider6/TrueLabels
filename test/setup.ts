@@ -13,6 +13,25 @@
  *    fake timer. A test that only passes because the machine was fast is not a test.
  * 2. No real network, camera, database or filesystem.
  */
+
+// Reanimated 4 installs worklet unpackers on the native runtime. Under Jest
+// there is no runtime, and reanimated's real initialiser serialises a worklet
+// while the module is still being imported, which throws before any test body
+// runs.
+//
+// Worklets is stubbed first, because reanimated's own Jest mock still imports
+// the real reanimated — and the real reanimated is what loads worklets. Only
+// the identifiers listed in `./fakes/worklets` are read during that evaluation,
+// so the stub is the whole surface needed. Reanimated is then swapped for its
+// published mock, which replaces the animation layer with plain JS objects;
+// `useAnimatedStyle` still invokes the callback it is given, so hooks written
+// for it are exercised rather than skipped.
+jest.mock('react-native-worklets', () => require('./fakes/worklets'));
+
+jest.mock('react-native-reanimated', () =>
+  require('react-native-reanimated/mock')
+);
+
 import { installFakeCamera, installFakeOcr, resetCamera, resetOcr } from './fakes/camera';
 import {
   installAlertRecorder,

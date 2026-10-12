@@ -13,7 +13,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { camera, emitBarcode, markCameraReady, resetCamera } from '@test/fakes/camera';
 import { alerts, appHistoryModule, navigatedTo, pressAlertButton, router } from '@test/fakes/environment';
 import { lastSeenResult, renderWithObservedResult } from '@test/render';
-import HomeScreen from './index';
+import HomeScreen from '../../app/index';
 
 type OffModule = typeof import('@/off/client');
 

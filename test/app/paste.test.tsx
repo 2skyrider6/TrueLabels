@@ -11,7 +11,7 @@ import React from 'react';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { alerts, appHistoryModule, navigatedTo, router } from '@test/fakes/environment';
 import { renderWithResult } from '@test/render';
-import PasteScreen from './paste';
+import PasteScreen from '../../app/paste';
 
 const input = () => screen.getByLabelText('Ingredients text');
 const analyse = () => screen.getByRole('button', { name: 'Analyse ingredients' });

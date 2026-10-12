@@ -61,7 +61,7 @@ describe('migrations', () => {
     history.initDatabase();
 
     const db = sqlite.db();
-    expect(db.version()).toBe(3);
+    expect(db.version()).toBe(4);
     expect(db.columns('scans')).toEqual([
       'id',
       'barcode',
@@ -80,6 +80,8 @@ describe('migrations', () => {
       'ingredients_json',
       'declared_allergens_json',
       'insufficient_data',
+      'coverage',
+      'ai_provenance_json',
     ]);
   });
 

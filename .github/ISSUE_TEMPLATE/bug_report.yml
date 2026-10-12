@@ -1,0 +1,96 @@
+name: Bug report
+description: Report a defect, especially any incorrect verdict
+labels: ["bug", "triage"]
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this.
+
+        If the bug concerns a **wrong verdict** — a product reported as safe that should not have been, or a missed allergen — please say so explicitly in the title. Those are treated as safety issues and get priority over cosmetic defects.
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      description: For a verdict bug, state what the verdict should have been.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: |
+        Include the exact ingredient text if you can copy it. If the scan came from a photo, note whether the label was in focus and readable.
+      placeholder: |
+        1. Open the app
+        2. Scan a pack of ...
+        3. Verdict shows ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: input
+    attributes:
+      label: Ingredient text involved
+      description: Paste the raw ingredient list if you have it. Do not include photographs of personal data.
+      render: text
+
+  - type: dropdown
+    id: source
+    attributes:
+      label: How was the scan made?
+      options:
+        - Barcode
+        - Label photo (OCR)
+        - Typed / pasted
+        - Opened from history
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Is this a safety-relevant verdict problem?
+      description: |
+        Choose "False safe" only if the app showed a clean verdict for a product it should have flagged.
+      options:
+        - No, cosmetic or unrelated
+        - Unclear / not sure
+        - Missed an allergen or additive (false safe)
+        - Flagged something incorrectly (false positive)
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      placeholder: e.g. 1.0.1
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device and OS
+      placeholder: e.g. Pixel 7a, Android 15
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots, logs, or the build type (development build, Expo Go, or store build).
+    validations:
+      required: false

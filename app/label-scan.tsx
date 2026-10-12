@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCameraPermission } from '@/hooks/useCameraPermission';
 import { useResult } from '@/context/ResultContext';
+import { useHaptic } from '@/hooks/useHaptic';
 import {
   recognizeTextFromUri,
   extractIngredientSection,
@@ -38,6 +39,7 @@ export default function LabelScanScreen() {
   const { hasPermission, hasCameraPermission, requestPermission } = useCameraPermission();
   const navigation = useRouter();
   const { setResult } = useResult();
+  const { trigger: haptic } = useHaptic();
 
   const cameraViewRef = useRef<any>(null);
   const permissionRequestedRef = useRef(false);
@@ -110,6 +112,7 @@ export default function LabelScanScreen() {
   // instead of via a cascading render.
   const takePicture = useCallback(async () => {
     if (!cameraViewRef.current) return;
+    haptic('medium');
     setProcessing(true);
     try {
       const result = await cameraViewRef.current.takePictureAsync({ quality: 0.85 });
@@ -125,15 +128,17 @@ export default function LabelScanScreen() {
     } finally {
       setProcessing(false);
     }
-  }, [runOcr]);
+  }, [runOcr, haptic]);
 
   const handleAnalyze = useCallback(
     (text: string, fromOcr: boolean = false) => {
       if (!text.trim()) {
+        haptic('error');
         Alert.alert('No Text', 'Please enter or capture ingredient text.');
         return;
       }
 
+      haptic('light');
       setProcessing(true);
       try {
         // Analysis is on-device and immediate, so there is nothing to await and
@@ -170,7 +175,7 @@ export default function LabelScanScreen() {
         setProcessing(false);
       }
     },
-    [imageUri, navigation, ocrFoundHeader, setResult]
+    [imageUri, navigation, ocrFoundHeader, setResult, haptic]
   );
 
   const retake = useCallback(() => {
@@ -268,6 +273,15 @@ export default function LabelScanScreen() {
                 <View style={styles.cameraHint} pointerEvents="none">
                   <Ionicons name="text-outline" size={15} color={colors.onCamera} style={styles.cameraHintIcon} />
                   <Text style={styles.cameraHintText}>Keep the ingredient list flat and in focus</Text>
+                </View>
+
+                {/* Corner brackets in the safety green, per the design system's
+                    OCR viewfinder treatment. */}
+                <View style={styles.reticle} pointerEvents="none">
+                  <View style={[styles.reticleCorner, styles.cornerTopLeft]} />
+                  <View style={[styles.reticleCorner, styles.cornerTopRight]} />
+                  <View style={[styles.reticleCorner, styles.cornerBottomLeft]} />
+                  <View style={[styles.reticleCorner, styles.cornerBottomRight]} />
                 </View>
               </View>
             )}
@@ -406,6 +420,31 @@ const styles = StyleSheet.create({
   cameraHintIcon: { marginTop: 1 },
   cameraHintText: { ...typography.caption, color: colors.onCamera },
   torchSlot: { position: 'absolute', top: spacing.md, right: spacing.md },
+
+  // Viewfinder brackets: emerald corners over the darkened camera backdrop.
+  reticle: { position: 'absolute', top: '12%', left: '8%', right: '8%', height: '60%' },
+  reticleCorner: {
+    position: 'absolute',
+    width: 28,
+    height: 28,
+    borderColor: colors.safe,
+  },
+  cornerTopLeft: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 8 },
+  cornerTopRight: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 8 },
+  cornerBottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderBottomLeftRadius: 8,
+  },
+  cornerBottomRight: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderBottomRightRadius: 8,
+  },
 
   previewImageWrap: { height: 300, position: 'relative' },
   imagePreview: { width: '100%', height: '100%', resizeMode: 'contain', backgroundColor: colors.scrim },

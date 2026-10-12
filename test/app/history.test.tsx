@@ -17,7 +17,7 @@ alerts,
   pressAlertButton,
 } from '@test/fakes/environment';
 import { lastSeenResult, renderWithObservedResult } from '@test/render';
-import HistoryScreen from './history';
+import HistoryScreen from '../../app/history';
 import type { ScanResult } from '@/rules/types';
 
 const history = () => appHistoryModule();

@@ -50,3 +50,10 @@ yarn-error.*
 
 # local notes
 PROGRESS.md
+
+# EAS build output logs (local build artifacts)
+eas-build-output*.txt
+eas-final-build.txt
+
+# internal planning documents
+label_detection_plan.md

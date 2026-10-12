@@ -17,7 +17,7 @@
     "android": {
       "package": "com.truelabels.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0F766E",
+        "backgroundColor": "#1E3E62",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -60,19 +60,10 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#E6F4FE"
+          "backgroundColor": "#F8FAFC"
         }
       ],
-      "expo-font",
-      "expo-asset",
-      [
-        "@sentry/react-native/expo",
-        {
-          "organization": "REPLACE_WITH_SENTRY_ORG_SLUG",
-          "project": "REPLACE_WITH_SENTRY_PROJECT_SLUG",
-          "url": "https://sentry.io/"
-        }
-      ]
+      "expo-asset"
     ],
     "extra": {
       "eas": {

@@ -1,10 +1,27 @@
 import { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
 import { HIT_SIZE, colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+/** Radius used by buttons and the smallest containers: 0.5rem / 8px. */
+const RADIUS_BUTTON = 8;
+
+/** Press scale for the primary action, per the design system. */
+const PRESS_SCALE = 0.99;
 
 // ---------------------------------------------------------------------------
 // Button
@@ -38,22 +55,53 @@ export function Button({
   accessibilityHint,
 }: ButtonProps) {
   const inactive = disabled || loading;
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+    };
+  });
+
+  const handlePressIn = () => {
+    if (inactive) return;
+    // `.set()` rather than `scale.value =`: the React Compiler lint rule does
+    // not recognise reanimated's mutable shared values, but a method call is
+    // still assignment-free and keeps the rule satisfied.
+    scale.set(
+      withSpring(PRESS_SCALE, {
+        damping: 15,
+        stiffness: 400,
+      })
+    );
+  };
+
+  const handlePressOut = () => {
+    if (inactive) return;
+    scale.set(
+      withSpring(1, {
+        damping: 15,
+        stiffness: 400,
+      })
+    );
+  };
 
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       disabled={inactive}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: inactive, busy: loading }}
-      style={({ pressed }) => [
+      style={[
         styles.button,
         buttonVariantStyles[variant],
         fullWidth && styles.buttonFull,
-        // A pressed fill instead of an opacity change keeps the label crisp.
-        !inactive && pressed && buttonPressedStyles[variant],
         inactive && styles.buttonDisabled,
+        animatedStyle,
         style,
       ]}
     >
@@ -75,22 +123,21 @@ export function Button({
           <Text style={[styles.buttonLabel, buttonVariantText[variant]]}>{label}</Text>
         </>
       )}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
+
+/**
+ * Translucent navy tint for the ghost variant. The design system specifies no
+ * border, so the tint alone has to carry the affordance.
+ */
+const GHOST_TINT = 'rgba(30, 62, 98, 0.06)';
 
 const buttonVariantStyles: Record<ButtonVariant, ViewStyle> = {
   primary: { backgroundColor: colors.primary, borderColor: colors.primary },
   secondary: { backgroundColor: colors.surface, borderColor: colors.borderStrong },
-  ghost: { backgroundColor: 'transparent', borderColor: 'transparent' },
+  ghost: { backgroundColor: GHOST_TINT, borderColor: 'transparent' },
   danger: { backgroundColor: colors.danger, borderColor: colors.danger },
-};
-
-const buttonPressedStyles: Record<ButtonVariant, ViewStyle> = {
-  primary: { backgroundColor: colors.primaryPressed },
-  secondary: { backgroundColor: colors.surfaceSunken },
-  ghost: { backgroundColor: colors.surfaceMuted },
-  danger: { backgroundColor: colors.dangerPressed },
 };
 
 const buttonVariantText: Record<ButtonVariant, { color: string }> = {
@@ -99,6 +146,56 @@ const buttonVariantText: Record<ButtonVariant, { color: string }> = {
   ghost: { color: colors.primary },
   danger: { color: colors.textInverse },
 };
+
+// ---------------------------------------------------------------------------
+// ScanTrigger — floating circular camera button
+// ---------------------------------------------------------------------------
+
+interface ScanTriggerProps {
+  onPress: () => void;
+  accessibilityLabel: string;
+  disabled?: boolean;
+}
+
+/**
+ * The primary capture control: a 64px circle with the dual-ring treatment from
+ * the design system — emerald inner ring, translucent navy outer ring.
+ */
+export function ScanTrigger({ onPress, accessibilityLabel, disabled = false }: ScanTriggerProps) {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = () => {
+    if (disabled) return;
+    scale.set(withSpring(0.96, { damping: 15, stiffness: 400 }));
+  };
+
+  const handlePressOut = () => {
+    if (disabled) return;
+    scale.set(withSpring(1, { damping: 15, stiffness: 400 }));
+  };
+
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      style={[styles.scanTriggerWrap, disabled && styles.buttonDisabled, animatedStyle]}
+    >
+      <View style={styles.scanTriggerRing} />
+      <View style={styles.scanTriggerFace}>
+        <Ionicons name="barcode-outline" size={26} color={colors.textInverse} />
+      </View>
+    </AnimatedPressable>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // IconButton
@@ -157,6 +254,7 @@ interface CardProps {
   padded?: boolean;
 }
 
+/** Clinical card container: white surface, 1px border, rounded-lg (16px). */
 export function Card({ children, style, padded = true }: CardProps) {
   return <View style={[styles.card, padded && styles.cardPadded, style]}>{children}</View>;
 }
@@ -209,6 +307,300 @@ export function Badge({ label, fg, bg, border, icon }: BadgeProps) {
       <Text style={[styles.badgeText, { color: fg }]} numberOfLines={1}>
         {label}
       </Text>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DietaryBadge — FSSAI-style veg / non-veg square
+// ---------------------------------------------------------------------------
+
+interface DietaryBadgeProps {
+  mark: 'veg' | 'non-veg' | 'unknown';
+  /** Rendered next to the square for screen readers and label readers. */
+  label?: string;
+}
+
+const DIETARY_FG = {
+  veg: colors.safe,
+  'non-veg': colors.nonVeg,
+  unknown: colors.textSubtle,
+} as const;
+
+const DIETARY_TEXT = {
+  veg: 'Vegetarian',
+  'non-veg': 'Non-vegetarian',
+  unknown: 'Mark unknown',
+} as const;
+
+/**
+ * The standardized Indian veg / non-veg mark: a 20x20px white square with a
+ * 1.5px coloured border and a filled centred indicator. Kept as a regulatory-
+ * familiar shape rather than a generic pill.
+ */
+export function DietaryBadge({ mark, label }: DietaryBadgeProps) {
+  const fg = DIETARY_FG[mark];
+  const text = label ?? DIETARY_TEXT[mark];
+
+  return (
+    <View
+      accessibilityLabel={text}
+      style={[styles.dietaryBadge, { borderColor: fg }]}
+    >
+      {mark === 'veg' ? (
+        <View style={[styles.dietaryDot, { backgroundColor: fg }]} />
+      ) : mark === 'non-veg' ? (
+        // A downward triangle, drawn with three borders rather than a glyph so
+        // the indicator stays geometric at any size.
+        <View style={[styles.dietaryTriangle, { borderTopColor: fg }]} />
+      ) : (
+        <View style={[styles.dietaryDot, { backgroundColor: fg }]} />
+      )}
+    </View>
+  );
+}
+
+/** Text pill for advisory marks such as palm-oil detection. */
+interface AdvisoryBadgeProps {
+  label: string;
+  fg?: string;
+  bg?: string;
+  border?: string;
+}
+
+export function AdvisoryBadge({ label, fg, bg, border }: AdvisoryBadgeProps) {
+  const palette = {
+    fg: fg ?? colors.caution,
+    bg: bg ?? colors.cautionSoft,
+    border: border ?? colors.cautionBorder,
+  };
+  return (
+    <View style={[styles.advisoryBadge, { backgroundColor: palette.bg, borderColor: palette.border }]}>
+      <Text style={[styles.advisoryBadgeText, { color: palette.fg }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AdditivePill — INS code with plain-English descriptor
+// ---------------------------------------------------------------------------
+
+interface AdditivePillProps {
+  /** The INS code, rendered in monospace. */
+  code: string;
+  /** Plain-English functional descriptor, e.g. "Citric Acid". */
+  descriptor: string;
+  /** Hazard level driving the pill colour. */
+  tone?: 'safe' | 'caution' | 'unsafe';
+}
+
+const ADDITIVE_FG = {
+  safe: colors.safe,
+  caution: colors.caution,
+  unsafe: colors.danger,
+} as const;
+
+const ADDITIVE_BG = {
+  safe: colors.safeSoft,
+  caution: colors.cautionSoft,
+  unsafe: colors.dangerSoft,
+} as const;
+
+const ADDITIVE_BORDER = {
+  safe: colors.safeBorder,
+  caution: colors.cautionBorder,
+  unsafe: colors.dangerBorder,
+} as const;
+
+/** `INS 330 · Citric Acid` — pill-shaped, 24px tall, monospaced code. */
+export function AdditivePill({ code, descriptor, tone = 'safe' }: AdditivePillProps) {
+  const fg = ADDITIVE_FG[tone];
+  return (
+    <View style={[styles.additivePill, { backgroundColor: ADDITIVE_BG[tone], borderColor: ADDITIVE_BORDER[tone] }]}>
+      <Text style={[styles.additiveCode, { color: fg }]}>{code}</Text>
+      <Text style={styles.additiveDescriptor} numberOfLines={1}>
+        {descriptor}
+      </Text>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SafetyMeter — 0-100 health score
+// ---------------------------------------------------------------------------
+
+interface SafetyMeterProps {
+  /** 0-100. */
+  score: number;
+  /** Show the numeric value beside the track. */
+  showValue?: boolean;
+  height?: number;
+  accessibilityLabel?: string;
+}
+
+/** Score zone thresholds, with the colour each zone renders in. */
+function scoreZone(score: number): { fg: string; label: string } {
+  if (score >= 70) return { fg: colors.safe, label: 'Pure' };
+  if (score >= 40) return { fg: colors.caution, label: 'Moderate risk' };
+  return { fg: colors.danger, label: 'Critical alert' };
+}
+
+/**
+ * Segmented horizontal track. A radial ring would be the other spec'd option,
+ * but a bar reads more reliably at small widths and keeps the number aligned
+ * with the fill for tabular display.
+ */
+export function SafetyMeter({
+  score,
+  showValue = true,
+  height = 10,
+  accessibilityLabel,
+}: SafetyMeterProps) {
+  const clamped = Math.max(0, Math.min(100, Math.round(score)));
+  const zone = scoreZone(clamped);
+  const label = accessibilityLabel ?? `Safety score ${clamped} out of 100, ${zone.label}`;
+
+  return (
+    <View
+      style={styles.safetyMeter}
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}
+      accessibilityValue={{ min: 0, max: 100, now: clamped }}
+    >
+      <View style={[styles.safetyMeterTrack, { height, borderRadius: height / 2 }]}>
+        <View
+          style={[
+            styles.safetyMeterFill,
+            { width: `${clamped}%`, backgroundColor: zone.fg, borderRadius: height / 2 },
+          ]}
+        />
+      </View>
+      {showValue ? (
+        <Text style={[styles.safetyMeterValue, { color: zone.fg }]}>{clamped}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Radial score ring for cards. Drawn from two half-circle overlays so no SVG
+ * dependency is needed; the numeric score sits in the middle.
+ */
+interface ScoreRingProps {
+  score: number;
+  size?: number;
+  thickness?: number;
+  accessibilityLabel?: string;
+}
+
+export function ScoreRing({ score, size = 56, thickness = 5, accessibilityLabel }: ScoreRingProps) {
+  const clamped = Math.max(0, Math.min(100, Math.round(score)));
+  const zone = scoreZone(clamped);
+
+  // Progress across the visible 180deg half-circle, from 0 to 180.
+  const sweep = Math.round((clamped / 100) * 180);
+
+  return (
+    <View
+      style={[styles.scoreRingContainer, { width: size, height: size / 2 + thickness }]}
+      accessibilityRole="image"
+      accessibilityLabel={accessibilityLabel ?? `Safety score ${clamped} out of 100, ${zone.label}`}
+    >
+      <View style={[styles.scoreRingTrack, { width: size, height: size, borderRadius: size / 2, borderWidth: thickness }]}>
+        <View
+          style={[
+            styles.scoreRingFill,
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              borderWidth: thickness,
+              borderColor: zone.fg,
+              // Only the half the fill has reached stays visible.
+              transform: [{ rotate: `${sweep - 180}deg` }],
+              opacity: sweep > 0 ? 1 : 0,
+            },
+          ]}
+        />
+      </View>
+      <View style={styles.scoreRingLabelWrap}>
+        <Text style={[styles.scoreRingText, { color: zone.fg }]}>{clamped}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ProductSafetyCard — score ring, thumbnail, brand, dietary pills
+// ---------------------------------------------------------------------------
+
+interface ProductSafetyCardProps {
+  score?: number;
+  title: string;
+  brand?: string;
+  imageUrl?: string;
+  vegMark?: 'veg' | 'non-veg' | 'unknown';
+  barcode?: string;
+  children?: ReactNode;
+}
+
+/** Placeholder thumbnail shown when a product has no image. */
+function ThumbnailPlaceholder({ size = 56 }: { size?: number }) {
+  return (
+    <View style={[styles.productThumb, { width: size, height: size }]}>
+      <Ionicons name="cube-outline" size={20} color={colors.textSubtle} />
+    </View>
+  );
+}
+
+/**
+ * The headline container for a scanned product: circular score ring, product
+ * thumbnail, brand headline, and a horizontal dietary pill container.
+ */
+export function ProductSafetyCard({
+  score,
+  title,
+  brand,
+  imageUrl,
+  vegMark,
+  barcode,
+  children,
+}: ProductSafetyCardProps) {
+  return (
+    <View style={styles.productSafetyCard}>
+      {score === undefined ? null : <ScoreRing score={score} />}
+
+      <View style={styles.productThumbWrap}>
+        {imageUrl ? (
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.productThumb}
+            resizeMode="contain"
+            accessibilityLabel={title}
+          />
+        ) : (
+          <ThumbnailPlaceholder size={56} />
+        )}
+      </View>
+
+      <View style={styles.productSafetyBody}>
+        <Text style={styles.productSafetyTitle} numberOfLines={2}>
+          {title}
+        </Text>
+        {brand ? (
+          <Text style={styles.productSafetyBrand} numberOfLines={1}>
+            {brand}
+          </Text>
+        ) : null}
+
+        <View style={styles.dietaryPillRow}>
+          {vegMark && vegMark !== 'unknown' ? <DietaryBadge mark={vegMark} /> : null}
+          {barcode ? <Text style={styles.productBarcodeCode}>{barcode}</Text> : null}
+          {children}
+        </View>
+      </View>
     </View>
   );
 }
@@ -276,7 +668,7 @@ export function EmptyState({ icon, title, message, action }: EmptyStateProps) {
   return (
     <View style={styles.emptyState}>
       <View style={styles.emptyIcon}>
-        <Ionicons name={icon} size={26} color={colors.primary} />
+        <Ionicons name={icon} size={32} color={colors.primary} />
       </View>
       <Text style={styles.emptyTitle} accessibilityRole="header">
         {title}
@@ -316,10 +708,11 @@ export function ScreenHeader({ title, subtitle, trailing }: ScreenHeaderProps) {
 }
 
 const styles = StyleSheet.create({
+  // -- Button ---------------------------------------------------------------
   button: {
-    minHeight: HIT_SIZE + 6,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radii.md,
+    minHeight: HIT_SIZE,
+    paddingHorizontal: spacing.lg,
+    borderRadius: RADIUS_BUTTON,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -335,16 +728,49 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  // -- ScanTrigger ----------------------------------------------------------
+  scanTriggerWrap: {
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Translucent navy outer ring.
+  scanTriggerRing: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: radii.pill,
+    borderWidth: 2,
+    borderColor: 'rgba(30, 62, 98, 0.28)',
+  },
+  // Emerald inner ring around the solid navy face.
+  scanTriggerFace: {
+    width: 54,
+    height: 54,
+    borderRadius: radii.pill,
+    borderWidth: 2,
+    borderColor: colors.safe,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.raised,
+  },
+
+  // -- IconButton -----------------------------------------------------------
   iconButton: {
     width: HIT_SIZE,
     height: HIT_SIZE,
-    borderRadius: radii.md,
+    borderRadius: RADIUS_BUTTON,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconButtonPressed: { opacity: 0.6 },
 
+  // -- Card -----------------------------------------------------------------
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
@@ -354,6 +780,7 @@ const styles = StyleSheet.create({
   },
   cardPadded: { padding: spacing.lg },
 
+  // -- SectionHeading -------------------------------------------------------
   sectionHeading: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -371,31 +798,170 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { ...typography.heading, color: colors.text, flexShrink: 1 },
 
+  // -- Badge ----------------------------------------------------------------
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xxs,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    borderRadius: radii.sm,
+    borderRadius: RADIUS_BUTTON,
     borderWidth: 1,
   },
   badgeIcon: { marginTop: 1 },
   badgeText: { ...typography.overline },
 
+  // -- DietaryBadge / AdvisoryBadge -----------------------------------------
+  dietaryBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 2,
+    borderWidth: 1.5,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dietaryDot: {
+    width: 8,
+    height: 8,
+    borderRadius: radii.pill,
+  },
+  // Zero-size box with coloured top and transparent sides gives a triangle.
+  dietaryTriangle: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 4.5,
+    borderRightWidth: 4.5,
+    borderBottomWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: 'transparent',
+  },
+  advisoryBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: RADIUS_BUTTON,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+  },
+  advisoryBadgeText: { ...typography.captionStrong },
+
+  // -- AdditivePill ---------------------------------------------------------
+  additivePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    height: 24,
+    paddingHorizontal: 8,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+  },
+  additiveCode: { ...typography.code },
+  additiveDescriptor: { ...typography.caption, color: colors.text, flexShrink: 1 },
+
+  // -- SafetyMeter ----------------------------------------------------------
+  safetyMeter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  safetyMeterTrack: {
+    flex: 1,
+    backgroundColor: colors.border,
+    overflow: 'hidden',
+  },
+  safetyMeterFill: {
+    height: '100%',
+  },
+  safetyMeterValue: {
+    ...typography.heading,
+    minWidth: 32,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
+  },
+
+  // -- ScoreRing ------------------------------------------------------------
+  scoreRingContainer: {
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  scoreRingTrack: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderColor: colors.border,
+  },
+  scoreRingFill: {
+    position: 'absolute',
+    top: -1,
+    left: -1,
+    // Only the left half is drawn; the right side stays transparent so the
+    // track underneath remains the neutral grey.
+    borderBottomColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
+  scoreRingLabelWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scoreRingText: {
+    ...typography.heading,
+    fontVariant: ['tabular-nums'],
+  },
+
+  // -- ProductSafetyCard ----------------------------------------------------
+  productSafetyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    ...shadows.card,
+  },
+  productThumbWrap: { width: 56 },
+  productThumb: {
+    borderRadius: RADIUS_BUTTON,
+    backgroundColor: colors.surfaceSunken,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  productSafetyBody: { flex: 1, gap: spacing.xxs },
+  productSafetyTitle: { ...typography.subheading, color: colors.text },
+  productSafetyBrand: { ...typography.caption, color: colors.textMuted },
+  dietaryPillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+    flexWrap: 'wrap',
+  },
+  productBarcodeCode: {
+    ...typography.code,
+    color: colors.textMuted,
+  },
+
+  // -- Chip -----------------------------------------------------------------
   chip: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: radii.sm,
+    borderRadius: RADIUS_BUTTON,
     borderWidth: 1,
   },
   chipText: { ...typography.captionStrong },
 
+  // -- Callout --------------------------------------------------------------
   callout: {
     flexDirection: 'row',
     gap: spacing.md,
     padding: spacing.md,
-    borderRadius: radii.md,
+    borderRadius: RADIUS_BUTTON,
     borderWidth: 1,
   },
   calloutIcon: { marginTop: 2 },
@@ -403,31 +969,34 @@ const styles = StyleSheet.create({
   calloutTitle: { ...typography.captionStrong, marginBottom: spacing.xxs },
   calloutText: { ...typography.caption, color: colors.textSecondary },
 
+  // -- EmptyState -----------------------------------------------------------
   emptyState: { alignItems: 'center', paddingHorizontal: spacing.xxl, paddingVertical: spacing.huge },
   emptyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: radii.xl,
+    width: 64,
+    height: 64,
+    borderRadius: radii.lg,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
   },
-  emptyTitle: { ...typography.heading, color: colors.text, marginBottom: spacing.xs },
+  emptyTitle: { ...typography.title, color: colors.text, marginBottom: spacing.sm, textAlign: 'center' },
   emptyMessage: {
     ...typography.body,
     color: colors.textMuted,
     textAlign: 'center',
     marginBottom: spacing.xl,
+    lineHeight: 24,
   },
-  emptyAction: { alignSelf: 'stretch' },
+  emptyAction: { alignSelf: 'stretch', maxWidth: 280 },
 
+  // -- ScreenHeader ---------------------------------------------------------
   screenHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.lg,
   },

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useResult } from '@/context/ResultContext';
+import { useHaptic } from '@/hooks/useHaptic';
 import { parseIngredients } from '@/rules/parser';
 import { evaluateEngine, loadRuleset } from '@/rules/engine';
 import { Button, Callout } from '@/components/ui';
@@ -23,15 +24,18 @@ export default function PasteScreen() {
   const [processing, setProcessing] = useState(false);
   const navigation = useRouter();
   const { setResult } = useResult();
+  const { trigger: haptic } = useHaptic();
 
   const canAnalyze = textInput.trim().length > 0 && !processing;
 
   const handleAnalyze = useCallback(async () => {
     if (!textInput.trim()) {
+      haptic('error');
       Alert.alert('No Text', 'Please paste ingredient text to analyze.');
       return;
     }
 
+    haptic('light');
     setProcessing(true);
 
     try {
@@ -57,7 +61,7 @@ export default function PasteScreen() {
     } finally {
       setProcessing(false);
     }
-  }, [textInput, navigation, setResult]);
+  }, [textInput, navigation, setResult, haptic]);
 
   return (
     <KeyboardAvoidingView

@@ -1,0 +1,63 @@
+name: Rule coverage request
+description: Ask for an allergen, additive, or substance to be added to the ruleset
+labels: ["ruleset", "good first issue"]
+title: "[Rule] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Rule additions are the highest-value contributions to this project, because the bundled rule set currently covers Latin-script terms only. If you know a regional or non-Latin ingredient that is not detected, this is the right template.
+
+  - type: input
+    id: term
+    attributes:
+      label: Term or ingredient name
+      placeholder: e.g. arachide, φυστίκι, 花生
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Allergen
+        - Additive
+        - Substance
+    validations:
+      required: true
+
+  - type: input
+    id: language
+    attributes:
+      label: Language and script
+      placeholder: e.g. Hindi (Devanagari), Arabic (Arabic script)
+    validations:
+      required: true
+
+  - type: input
+    id: maps_to
+    attributes:
+      label: What should it map to?
+      placeholder: e.g. peanut allergen
+    validations:
+      required: true
+
+  - type: textarea
+    id: ambiguity
+    attributes:
+      label: Contexts where this term should NOT match
+      description: |
+        This is the most important field. Bare ingredient names are ambiguous — "butter" means milk in "butter" but not in "peanut butter". List the contexts where a match would be a false positive.
+      placeholder: |
+        - should not match "..." because ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Links to a regulatory source, a food-standards authority listing, or a real label.
+    validations:
+      required: true

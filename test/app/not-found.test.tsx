@@ -16,7 +16,7 @@ import {
   router,
 } from '@test/fakes/environment';
 import { lastSeenResult, renderWithObservedResult } from '@test/render';
-import NotFoundScreen from './not-found';
+import NotFoundScreen from '../../app/not-found';
 
 type OffModule = typeof import('@/off/client');
 

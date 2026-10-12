@@ -41,6 +41,9 @@ module.exports = (api) => {
 
   return {
     presets: [['babel-preset-expo']],
-    plugins: isTest ? [dynamicImportToRequire] : [],
+    plugins: [
+      'react-native-reanimated/plugin',
+      ...(isTest ? [dynamicImportToRequire] : []),
+    ],
   };
 };
