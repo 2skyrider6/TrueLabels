@@ -1,4 +1,5 @@
 import { CameraView } from 'expo-camera';
+import type { RecognitionResult } from 'expo-mlkit-ocr';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,13 +17,12 @@ import { useCameraPermission } from '@/hooks/useCameraPermission';
 import { useResult } from '@/context/ResultContext';
 import { useHaptic } from '@/hooks/useHaptic';
 import {
-  recognizeTextFromUri,
-  extractIngredientSection,
-  isOcrSupported,
-} from '@/ocr/recognize';
+  recognizeOrchestrated,
+} from '@/ocr/orchestrator';
+import { extractIngredientSection, isOcrSupported } from '@/ocr/recognize';
 import { loadRuleset } from '@/rules/engine';
-import { analyze } from '@/ai/analyze';
 import { isRulesetReadable } from '@/ai/scripts';
+import { analyzeOrchestrated } from '@/ai/analyze-orchestrated';
 import { Button, Callout, IconButton } from '@/components/ui';
 import { colors, radii, shadows, spacing, typography } from '@/theme/tokens';
 
@@ -31,6 +31,7 @@ const ruleset = loadRuleset();
 export default function LabelScanScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [ocrText, setOcrText] = useState('');
+  const [ocrConfidence, setOcrConfidence] = useState<number | null>(null);
   /** Whether the text in `ocrText` came from a located ingredient list. */
   const [ocrFoundHeader, setOcrFoundHeader] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -78,12 +79,17 @@ export default function LabelScanScreen() {
   const runOcr = useCallback(async (uri: string) => {
     setProcessing(true);
     try {
-      const ocrResult = await recognizeTextFromUri(uri);
-      const section = extractIngredientSection(ocrResult);
+      const ocrResult = await recognizeOrchestrated(uri);
+      const recognitionResult: RecognitionResult = {
+        text: ocrResult.text,
+        blocks: [],
+      };
+      const section = extractIngredientSection(recognitionResult);
       setOcrText(section.text);
+      setOcrConfidence(ocrResult.confidence);
       // Remembered so an Analyze run on this OCR text is not mistaken for a
       // readable ingredient list when it was really just unrelated pack text.
-      setOcrFoundHeader(section.foundHeader);
+      setOcrFoundHeader(section.foundHeader && ocrResult.headerFound);
       if (!section.text.trim() || !section.foundHeader) {
         Alert.alert(
           'Ingredients Not Found',
@@ -131,7 +137,7 @@ export default function LabelScanScreen() {
   }, [runOcr, haptic]);
 
   const handleAnalyze = useCallback(
-    (text: string, fromOcr: boolean = false) => {
+    async (text: string, fromOcr: boolean = false) => {
       if (!text.trim()) {
         haptic('error');
         Alert.alert('No Text', 'Please enter or capture ingredient text.');
@@ -141,11 +147,18 @@ export default function LabelScanScreen() {
       haptic('light');
       setProcessing(true);
       try {
-        // Analysis is on-device and immediate, so there is nothing to await and
-        // nothing to fail: the rule set either reads the label or it does not.
-        const outcome = analyze(text, {
+        // Analysis runs the orchestrated pipeline: fuzzy rule matching with
+        // confidence scoring on the OCR text we already captured.
+        const outcome = await analyzeOrchestrated(imageUri ?? '', {
           ruleset,
           foundHeader: fromOcr ? ocrFoundHeader : true,
+          ocrResult: {
+            text: ocrText,
+            confidence: ocrConfidence ?? 0.5,
+            passes: [],
+            headerFound: ocrFoundHeader,
+            bestImageUri: imageUri ?? '',
+          },
         });
 
         setResult({
@@ -154,7 +167,17 @@ export default function LabelScanScreen() {
           imageUrl: imageUri ?? undefined,
           rawIngredients: text,
           parsed: outcome.parsed,
-          flags: outcome.result.flags,
+          flags: outcome.result.flags.map(f => ({
+            id: f.id,
+            severity: f.severity,
+            label: f.label,
+            reason: f.reason,
+            category: f.category,
+            crossContamination: f.crossContamination,
+            confidence: f.confidence,
+            matchType: f.matchType,
+            matchedTerm: f.matchedTerm,
+          })),
           verdict: outcome.result.verdict,
           insufficientData: outcome.result.insufficientData,
           coverage: outcome.coverage,
@@ -166,6 +189,7 @@ export default function LabelScanScreen() {
           offAttribution: false,
           createdAt: new Date().toISOString(),
           rulesetVersion: ruleset.rulesetVersion,
+          ocrConfidence: outcome.ocrConfidence,
         });
         navigation.replace('/result');
       } catch (error) {
@@ -175,7 +199,7 @@ export default function LabelScanScreen() {
         setProcessing(false);
       }
     },
-    [imageUri, navigation, ocrFoundHeader, setResult, haptic]
+    [imageUri, navigation, ocrFoundHeader, ocrText, ocrConfidence, setResult, haptic]
   );
 
   const retake = useCallback(() => {
@@ -326,14 +350,19 @@ export default function LabelScanScreen() {
                   accessibilityLabel="Recognized ingredients text"
                 />
                 {ocrText.length > 0 && (
-                  <View style={styles.editorFooter}>
-                    <Text style={styles.charCount}>
-                      {ocrText.trim().split(/[,\n]/).filter(s => s.trim()).length} items
-                    </Text>
-                    {!ocrFoundHeader && (
-                      <Text style={styles.unverifiedNote}>Ingredient list not located</Text>
-                    )}
-                  </View>
+              <View style={styles.editorFooter}>
+                <Text style={styles.charCount}>
+                  {ocrText.trim().split(/[,\n]/).filter(s => s.trim()).length} items
+                </Text>
+                {ocrConfidence !== null && (
+                  <Text style={[styles.ocrConfidence, ocrConfidence < 0.7 && styles.ocrConfidenceLow]}>
+                    OCR confidence: {Math.round(ocrConfidence * 100)}%
+                  </Text>
+                )}
+                {!ocrFoundHeader && (
+                  <Text style={styles.unverifiedNote}>Ingredient list not located</Text>
+                )}
+              </View>
                 )}
               </View>
 
@@ -483,4 +512,6 @@ const styles = StyleSheet.create({
   },
   charCount: { ...typography.caption, color: colors.textMuted },
   unverifiedNote: { ...typography.captionStrong, color: colors.caution },
+  ocrConfidence: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xxs },
+  ocrConfidenceLow: { color: colors.caution },
 });

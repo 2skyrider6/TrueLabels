@@ -20,6 +20,12 @@ export interface Flag {
   reason: string;
   category: FlagCategory;
   crossContamination?: boolean;
+  /** Match confidence (0-1). 1.0 = exact match, lower = fuzzy match. */
+  confidence?: number;
+  /** How the match was made: exact, fuzzy, partial, or none. */
+  matchType?: 'exact' | 'fuzzy' | 'partial' | 'none';
+  /** The rule term that was matched (for fuzzy matches). */
+  matchedTerm?: string;
 }
 
 export type Verdict = 'safe' | 'caution' | 'unsafe';
@@ -90,6 +96,8 @@ export interface ScanResult {
    * label's language, so a clean verdict must not be shown as a bill of health.
    */
   coverage?: Coverage;
+  /** OCR confidence score (0-1) from multi-pass OCR. */
+  ocrConfidence?: number;
   /** Which tier produced the verdict, for the result screen's disclosure. */
   analysisSource?: AnalysisSource;
   /** Coverage and ruleset version the verdict was recorded under. */

@@ -125,6 +125,16 @@ export default function ResultScreen() {
           </Text>
           <Text style={styles.heroMessage}>{verdictMessage}</Text>
 
+          {/* OCR confidence indicator */}
+          {result.ocrConfidence !== null && result.ocrConfidence !== undefined && (
+            <View style={styles.ocrConfidenceRow}>
+              <Ionicons name="scan-outline" size={14} color={colors.textMuted} />
+              <Text style={[styles.ocrConfidenceText, result.ocrConfidence < 0.7 && styles.ocrConfidenceLow]}>
+                OCR confidence: {Math.round(result.ocrConfidence * 100)}%
+              </Text>
+            </View>
+          )}
+
           {/* Safety meter. The score is only shown once the verdict is trusted,
               so a NOT VERIFIED label never displays a number that reads as a
               clean bill of health. */}
@@ -263,21 +273,26 @@ export default function ResultScreen() {
                     >
                       <View style={styles.flagRowHeader}>
                         <View style={[styles.flagDot, { backgroundColor: flagTone.fg }]} />
-                        {ins ? (
-                          <AdditivePill
-                            code={ins.code}
-                            descriptor={ins.descriptor}
-                            tone={pillTone}
-                          />
-                        ) : (
-                          <Text style={styles.flagLabel}>{flag.label}</Text>
-                        )}
-                        <Badge
-                          label={flag.severity}
-                          fg={flagTone.fg}
-                          bg={flagTone.bg}
-                          border={flagTone.border}
+                      {ins ? (
+                        <AdditivePill
+                          code={ins.code}
+                          descriptor={ins.descriptor}
+                          tone={pillTone}
                         />
+                      ) : (
+                        <Text style={styles.flagLabel}>{flag.label}</Text>
+                      )}
+                      {flag.matchType && flag.matchType !== 'exact' && (
+                        <Text style={[styles.flagMatchType, flag.matchType === 'fuzzy' && styles.flagMatchTypeFuzzy]}>
+                          {flag.matchType === 'fuzzy' ? '~' : '≈'}
+                        </Text>
+                      )}
+                      <Badge
+                        label={flag.severity}
+                        fg={flagTone.fg}
+                        bg={flagTone.bg}
+                        border={flagTone.border}
+                      />
                         <Ionicons
                           name={expanded ? 'chevron-up' : 'chevron-down'}
                           size={16}
@@ -488,6 +503,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xs,
   },
+  ocrConfidenceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    alignSelf: 'center',
+    marginTop: spacing.sm,
+  },
+  ocrConfidenceText: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
+  ocrConfidenceLow: {
+    color: colors.caution,
+  },
   heroMeter: {
     alignSelf: 'stretch',
     marginTop: spacing.lg,
@@ -525,6 +554,14 @@ const styles = StyleSheet.create({
   flagRowHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   flagDot: { width: 8, height: 8, borderRadius: radii.pill },
   flagLabel: { ...typography.bodyStrong, color: colors.text, flex: 1 },
+  flagMatchType: {
+    ...typography.caption,
+    color: colors.textSubtle,
+    marginLeft: spacing.xs,
+  },
+  flagMatchTypeFuzzy: {
+    color: colors.caution,
+  },
   flagTagRow: { flexDirection: 'row', marginTop: spacing.sm, paddingLeft: 16 },
   flagReason: {
     ...typography.caption,

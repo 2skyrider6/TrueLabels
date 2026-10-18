@@ -15,7 +15,8 @@ export type EvalCategory =
   | 'non-latin-declared'
   | 'latin-uncovered-language'
   | 'clean-control'
-  | 'unreadable';
+  | 'unreadable'
+  | 'ocr-typo';
 
 export interface EvalCase {
   id: string;
@@ -241,7 +242,7 @@ expectedVerdict: 'unsafe',
       'The most dangerous shape of this case: a genuinely allergen-free label in a ' +
       'language the app cannot read. Reporting SAFE here would be a false negative in ' +
       'the one direction that hurts.',
-},
+  },
 ];
 
 export const EVAL_CASES_BY_ID = new Map(EVAL_CASES.map(item => [item.id, item]));
