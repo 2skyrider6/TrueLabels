@@ -29,6 +29,7 @@ import {
   confidenceTriggersVerdict,
   matchTerm,
 } from '../rules/fuzzy';
+import { searchIngredient } from './web-search';
 
 /**
  * Output of the orchestrated analysis pipeline.
@@ -45,11 +46,11 @@ export interface OrchestratedAnalysisResult {
   /** Coverage assessment */
   coverage: Coverage;
   /** Analysis source */
-  source: 'rules';
+  source: 'rules' | 'web';
   /** Provenance metadata */
   provenance: {
     coverage: Coverage;
-    source: 'rules';
+    source: 'rules' | 'web';
     rulesetVersion: string;
   };
   /** Dominant script of the text */
@@ -69,7 +70,7 @@ export interface OrchestratedAnalysisResult {
  */
 export interface FlagWithConfidence {
   id: string;
-  severity: 'unsafe' | 'caution';
+  severity: 'unsafe' | 'caution' | 'safe';
   label: string;
   reason: string;
   category: 'allergen' | 'additive' | 'substance' | 'label-warning';
@@ -77,6 +78,8 @@ export interface FlagWithConfidence {
   confidence: number;
   matchType: 'exact' | 'fuzzy' | 'partial' | 'none';
   matchedTerm?: string;
+  /** Where the flag came from: local rule engine or web search. */
+  source?: 'local' | 'web';
 }
 
 /**
@@ -122,24 +125,48 @@ export async function analyzeOrchestrated(
   // Step 5: Combine exact and fuzzy flags
   const allFlags = combineFlagsWithConfidence(exactResult.flags, fuzzyFlags);
 
-  // Step 6: Determine verdict
-  // Exact verdict is the base; fuzzy unsafe matches can upgrade
+  // Step 6: Web search for ingredients that have no local flag at all.
+  // Unknown ingredients are those not covered by any local flag.
+  const webFlags = await webFlagForUnmatchedIngredients(
+    parsed,
+    allFlags,
+    ruleset,
+  );
+
+  // Step 7: Combine all flags (local exact + fuzzy + web)
+  const allFlagsWithWeb = combineFlagsWithConfidence(allFlags, webFlags);
+
+  // Step 8: Determine verdict.
+  // Exact verdict is the base; fuzzy and web-sourced unsafe matches can upgrade,
+  // web-sourced safe matches can downgrade (web is treated as equally authoritative).
   let verdict: Verdict = exactResult.verdict;
-  if (exactResult.verdict === 'safe' || exactResult.verdict === 'caution') {
-    const hasUnsafeFuzzy = fuzzyFlags.some(
-      f => f.severity === 'unsafe' && confidenceTriggersVerdict(f.confidence, 'unsafe')
+
+  // Web unsafe can upgrade a safe/caution verdict.
+  if (verdict === 'safe' || verdict === 'caution') {
+    const hasUnsafeWeb = webFlags.some(
+      f => f.severity === 'unsafe' && confidenceTriggersVerdict(f.confidence, 'unsafe'),
     );
-    if (hasUnsafeFuzzy) {
+    if (hasUnsafeWeb) {
       verdict = 'unsafe';
     } else if (
-      exactResult.verdict === 'safe' &&
-      fuzzyFlags.some(f => f.severity === 'caution' && confidenceTriggersVerdict(f.confidence, 'caution'))
+      verdict === 'safe' &&
+      webFlags.some(f => f.severity === 'caution' && confidenceTriggersVerdict(f.confidence, 'caution'))
     ) {
       verdict = 'caution';
     }
   }
 
-  // Step 7: Apply safety gate (presentVerdict is the single authority)
+  // Web safe can downgrade an unsafe verdict (web is treated as equally authoritative).
+  if (verdict === 'unsafe') {
+    const hasSafeWeb = webFlags.some(
+      f => f.severity === 'safe' && confidenceTriggersVerdict(f.confidence, 'safe'),
+    );
+    if (hasSafeWeb) {
+      verdict = 'safe';
+    }
+  }
+
+  // Step 9: Apply safety gate (presentVerdict is the single authority)
   const insufficientData =
     exactResult.insufficientData || parsed.ingredients.length === 0;
   const coverage = ocrResult.headerFound ? 'verified' : 'unverified';
@@ -149,21 +176,21 @@ export async function analyzeOrchestrated(
   return {
     parsed,
     result: {
-      flags: allFlags,
+      flags: allFlagsWithWeb,
       verdict,
       insufficientData,
     },
     coverage,
-    source: 'rules',
+    source: webFlags.length > 0 ? 'web' : 'rules',
     provenance: {
       coverage,
-      source: 'rules',
+      source: webFlags.length > 0 ? 'web' : 'rules',
       rulesetVersion: ruleset.rulesetVersion,
     },
     language: '',
     escalation: presentation.caveat ?? 'Checked against the bundled allergen ruleset, on this device.',
     ocrConfidence: ocrResult.confidence,
-    flagsWithConfidence: allFlags,
+    flagsWithConfidence: allFlagsWithWeb,
     overallConfidence: Math.min(ocrResult.confidence, 0.95),
   };
 }
@@ -178,7 +205,7 @@ function matchIngredientsWithFuzzy(
   existingFlagIds: Set<string>
 ): {
   id: string;
-  severity: 'unsafe' | 'caution';
+  severity: 'unsafe' | 'caution' | 'safe';
   label: string;
   reason: string;
   category: 'allergen' | 'additive' | 'substance' | 'label-warning';
@@ -199,7 +226,7 @@ function matchIngredientsWithFuzzy(
 
   const fuzzyFlags: {
     id: string;
-    severity: 'unsafe' | 'caution';
+    severity: 'unsafe' | 'caution' | 'safe';
     label: string;
     reason: string;
     category: 'allergen' | 'additive' | 'substance' | 'label-warning';
@@ -288,4 +315,62 @@ function combineFlagsWithConfidence(
   }
 
   return combined;
+}
+
+/**
+ * Run Wikipedia search for ingredients that have no local flag at all.
+ * Returns web-sourced flags for ingredients Wikipedia could identify.
+ */
+async function webFlagForUnmatchedIngredients(
+  parsed: ParsedIngredients,
+  existingFlags: FlagWithConfidence[],
+  _ruleset: Ruleset,
+): Promise<FlagWithConfidence[]> {
+  // Collect all ingredient texts
+  const allIngredients: string[] = [
+    ...parsed.ingredients,
+    ...parsed.declaredAllergens,
+    ...parsed.mayContain,
+  ];
+
+  // Deduplicate case-insensitively
+  const uniqueIngredients = [...new Set(allIngredients.map(i => i.toLowerCase().trim()))]
+    .filter(i => i.length > 0);
+
+  // Find ingredients that already have a flag (by label text containment)
+  const flaggedIngredients = new Set<string>();
+  for (const ingredient of uniqueIngredients) {
+    for (const f of existingFlags) {
+      if (ingredient.includes(f.label.toLowerCase()) || f.label.toLowerCase().includes(ingredient)) {
+        flaggedIngredients.add(ingredient);
+        break;
+      }
+    }
+  }
+
+  const unmatchedIngredients = uniqueIngredients.filter(i => !flaggedIngredients.has(i));
+
+  if (unmatchedIngredients.length === 0) return [];
+
+  // Search Wikipedia for each unmatched ingredient (sequential to avoid rate limits)
+  const webFlags: FlagWithConfidence[] = [];
+  for (const ingredient of unmatchedIngredients) {
+    const result = await searchIngredient(ingredient);
+    if (!result || result.verdict === 'unknown') continue;
+
+  webFlags.push({
+      id: `web:${ingredient.toLowerCase().replace(/\s+/g, '-')}`,
+      severity: result.verdict,
+      label: ingredient,
+      reason: `Identified via web search: ${result.result?.snippet ?? 'No description available'}`,
+      category: 'additive',
+      crossContamination: false,
+      confidence: result.confidence,
+      matchType: 'fuzzy',
+      matchedTerm: result.result?.title,
+      source: 'web',
+    });
+  }
+
+  return webFlags;
 }

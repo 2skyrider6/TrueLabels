@@ -60,7 +60,7 @@ export function analyze(
   const { parsed, result: raw } = runDeterministic(text, ruleset);
   const result = applyHeaderSignal(raw, options.foundHeader);
   const coverage = assessDeterministicCoverage(text, result, options.foundHeader);
-  const source: AnalysisSource = result.insufficientData ? 'none' : 'rules';
+  const source: AnalysisSource = 'rules';
 
   return {
     parsed,

@@ -176,7 +176,7 @@ export const CONFIDENCE_THRESHOLDS = {
  */
 export function confidenceTriggersVerdict(
   confidence: number,
-  severity: 'unsafe' | 'caution'
+  severity: 'unsafe' | 'caution' | 'safe'
 ): boolean {
   const threshold =
     severity === 'unsafe'

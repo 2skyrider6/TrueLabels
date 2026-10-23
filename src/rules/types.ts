@@ -1,6 +1,6 @@
 import type { AiProvenance, AnalysisSource, Coverage } from '../ai/types';
 
-export type Severity = 'unsafe' | 'caution';
+export type Severity = 'unsafe' | 'caution' | 'safe';
 
 /**
  * Re-exported from the AI layer so the domain types can describe coverage without
@@ -26,6 +26,8 @@ export interface Flag {
   matchType?: 'exact' | 'fuzzy' | 'partial' | 'none';
   /** The rule term that was matched (for fuzzy matches). */
   matchedTerm?: string;
+  /** Where the flag came from: local rule engine or web search. */
+  source?: 'local' | 'web';
 }
 
 export type Verdict = 'safe' | 'caution' | 'unsafe';

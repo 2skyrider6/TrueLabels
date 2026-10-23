@@ -13,7 +13,7 @@
  */
 
 /** Where a verdict's underlying evidence came from. */
-export type AnalysisSource = 'rules' | 'none';
+export type AnalysisSource = 'rules' | 'web';
 
 /**
  * How much confidence the pipeline has that it actually *read* the label.

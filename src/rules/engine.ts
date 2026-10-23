@@ -196,7 +196,7 @@ export function evaluateEngine(
       : 'safe';
 
   allFlags.sort((a, b) => {
-    const severityOrder = { unsafe: 0, caution: 1 };
+    const severityOrder = { unsafe: 0, caution: 1, safe: 2 };
     return severityOrder[a.severity] - severityOrder[b.severity];
   });
 
