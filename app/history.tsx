@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useResult } from '@/context/ResultContext';
@@ -33,6 +33,19 @@ export default function HistoryScreen() {
   const navigation = useRouter();
   const { trigger: haptic } = useHaptic();
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredScans = useMemo(() => {
+    if (!searchQuery.trim()) return scans;
+    const q = searchQuery.toLowerCase();
+    return scans.filter(scan => {
+      const productName = (scan.productName || '').toLowerCase();
+      const barcode = (scan.barcode || '').toLowerCase();
+      const verdict = (scan.verdict || '').toLowerCase();
+      const source = (scan.source || '').toLowerCase();
+      return productName.includes(q) || barcode.includes(q) || verdict.includes(q) || source.includes(q);
+    });
+  }, [scans, searchQuery]);
 
   const handleDelete = useCallback(
     (id: number) => {
@@ -250,6 +263,23 @@ export default function HistoryScreen() {
         ) : null}
       </View>
 
+      {/* Search bar */}
+      <View style={styles.searchBar}>
+        <View style={styles.searchInputWrap}>
+          <Ionicons name="search-outline" size={18} color={colors.textMuted} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search scans..."
+            placeholderTextColor={colors.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="done"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+      </View>
+
       {scans.length === 0 ? (
         <View style={styles.emptyWrap}>
           <EmptyState
@@ -267,7 +297,7 @@ export default function HistoryScreen() {
         </View>
       ) : (
         <FlatList
-          data={scans}
+          data={filteredScans}
           keyExtractor={scan => String(scan.id)}
           renderItem={renderScan}
           contentContainerStyle={styles.listContent}
@@ -329,6 +359,27 @@ const styles = StyleSheet.create({
   emptyWrap: { flex: 1, justifyContent: 'center' },
 
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.huge },
+
+  searchBar: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  searchInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceSunken,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  searchIcon: { marginRight: spacing.sm, marginTop: 1 },
+  searchInput: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 15,
+  },
 
   scanCard: {
     flexDirection: 'row',

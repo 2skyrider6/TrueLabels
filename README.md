@@ -51,6 +51,14 @@ loudly — instead of guessing.
 
 ## Try it
 
+### Option 1: Download the app (easiest)
+
+Download the latest release APK from the [Releases page](https://github.com/2skyrider6/TrueLabels/releases) and install it on your Android device.
+
+No build required — just install and scan.
+
+### Option 2: Build from source
+
 ```bash
 # 1. Clone
 git clone https://github.com/2skyrider6/TrueLabels.git
