@@ -39,3 +39,13 @@ Docs: https://docs.expo.dev/eas/index.md
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
 - Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+
+## UI work rules (apply to every task)
+- Scope is UI only. Never edit src/ai/**, src/rules/**, src/ocr/**, src/db/**, or any *.test.* file. Never change verdict, coverage or safetyScore logic. Calling presentVerdict or safetyScore is fine. If a task seems to need more than that, stop and tell me.
+- Before editing, read src/theme/tokens.ts and src/components/ui.tsx. Use only tokens that exist. If one is missing, add it to tokens.ts. Never put a hex, rgba or magic number in a screen.
+- Reuse components from ui.tsx. Do not create a new component if one exists.
+- Emerald, amber and red mean verdicts only (safe, caution, unsafe). Neutral UI uses navy and greys.
+- Copy the code I give you exactly. Do not restyle, rename, reformat or "improve" anything I did not ask for.
+- Change only the files named in the task and only what the task lists.
+- After every task run: npm run typecheck && npm run lint && npm test. Fix errors you caused. Show me the output. Never edit a test to make it pass.
+- Do not install packages unless the task says so.

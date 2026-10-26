@@ -97,107 +97,90 @@ export const radii = {
 } as const;
 
 // ============================================================================
-// TYPOGRAPHY — Plus Jakarta Sans (headings) + Inter (body)
+// TYPOGRAPHY — Inter (all text) via expo-google-fonts
 // ============================================================================
 
 /**
- * Font families. Using system fonts as fallbacks since custom fonts
- * require bundling TTF files. The design is achieved through sizing,
- * weight, and letter-spacing specs from the design system.
- * 
- * For custom fonts, add TTF files to assets/fonts/ and load via expo-font.
+ * Font weights mapped to Inter font weights loaded via expo-google-fonts
+ * (see app/_layout.tsx).
+ * - 400 or normal -> Inter_400Regular
+ * - 500 -> Inter_500Medium
+ * - 600 -> Inter_600SemiBold
+ * - 700 or higher -> Inter_700Bold
  */
-export const fontFamily = {
-  // System font on iOS (SF Pro) and Android (Roboto) approximate Inter/Plus Jakarta Sans
-  heading: undefined, // Uses system font, weight controlled per style
-  body: undefined,    // Uses system font
-  mono: 'monospace',
-} as const;
-
 export const typography = {
   /** Display — largest scan header (mobile). */
   display: {
-    fontFamily: fontFamily.heading,
+    fontFamily: 'Inter_700Bold',
     fontSize: 28,
     lineHeight: 36,
-    fontWeight: '700' as const,
     letterSpacing: -0.28,
   },
   /** Title — product names, screen titles. */
   title: {
-    fontFamily: fontFamily.heading,
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 24,
     lineHeight: 32,
-    fontWeight: '600' as const,
     letterSpacing: -0.24,
   },
   /** Heading — section headers. */
   heading: {
-    fontFamily: fontFamily.heading,
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 18,
     lineHeight: 24,
-    fontWeight: '600' as const,
     letterSpacing: -0.18,
   },
   /** Subheading — brand names, secondary emphasis. */
   subheading: {
-    fontFamily: fontFamily.heading,
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 16,
     lineHeight: 24,
-    fontWeight: '600' as const,
   },
   /** Body — primary reading text. */
   body: {
-    fontFamily: fontFamily.body,
+    fontFamily: 'Inter_400Regular',
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: '400' as const,
   },
   /** Body strong — emphasized body text. */
   bodyStrong: {
-    fontFamily: fontFamily.body,
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 16,
     lineHeight: 24,
-    fontWeight: '600' as const,
   },
   /** Caption — metadata, helper text. */
   caption: {
-    fontFamily: fontFamily.body,
+    fontFamily: 'Inter_400Regular',
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: '400' as const,
   },
   /** Caption strong — labelled metadata. */
   captionStrong: {
-    fontFamily: fontFamily.body,
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: '600' as const,
     letterSpacing: 0.24,
   },
   /** Overline — uppercase micro-labels, eyebrows. */
   overline: {
-    fontFamily: fontFamily.body,
+    fontFamily: 'Inter_500Medium',
     fontSize: 11,
     lineHeight: 14,
-    fontWeight: '500' as const,
     letterSpacing: 0.44,
     textTransform: 'uppercase' as const,
   },
   /** Verdict — large all-caps safety score headline. */
   verdict: {
-    fontFamily: fontFamily.heading,
+    fontFamily: 'Inter_700Bold',
     fontSize: 36,
     lineHeight: 44,
-    fontWeight: '800' as const,
     letterSpacing: 1.2,
   },
   /** INS / chemical codes — tabular numbers for alignment. */
   code: {
-    fontFamily: fontFamily.mono,
+    fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }),
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: '600' as const,
     letterSpacing: 0.6,
   },
 } as const;

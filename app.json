@@ -72,7 +72,8 @@
       ],
       "expo-asset",
       "expo-image",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font"
     ],
     "extra": {
       "eas": {

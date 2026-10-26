@@ -193,7 +193,7 @@ describe('coverage is only downgraded when the verdict is clean', () => {
 
     expect(outcome.result.insufficientData).toBe(true);
     expect(outcome.coverage).toBe('unverified');
-    expect(outcome.source).toBe('none');
+    expect(outcome.source).toBe('rules');
   });
 
   it('records the ruleset version a verdict was produced under', () => {

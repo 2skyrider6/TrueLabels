@@ -1,9 +1,12 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import * as Sentry from '@sentry/react-native';
 import { ResultProvider } from '@/context/ResultContext';
 import { appEnvironment, isDevelopment, sentryDsn } from '@/config/env';
 import { colors, typography } from '@/theme/tokens';
+import { useEffect } from 'react';
+import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 
 if (sentryDsn) {
   Sentry.init({
@@ -18,7 +21,26 @@ if (sentryDsn) {
   });
 }
 
+SplashScreen.preventAutoHideAsync();
+
 function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
+
   return (
     <ResultProvider>
       <StatusBar style="dark" />

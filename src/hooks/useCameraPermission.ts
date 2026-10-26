@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Camera } from 'expo-camera';
-import { AsyncStorage } from 'expo-secure-store';
+import { getItemAsync, setItemAsync } from 'expo-secure-store';
 
 /**
  * Key used to persist the camera permission decision across app restarts.
@@ -23,7 +23,7 @@ export function useCameraPermission() {
 
     async function loadCachedPermission() {
       try {
-        const stored = await AsyncStorage.getItem(CAMERA_PERMISSION_KEY);
+        const stored = await getItemAsync(CAMERA_PERMISSION_KEY);
         if (!cancelled && stored !== null) {
           setHasPermission(stored === 'granted');
         } else if (!cancelled) {
@@ -50,7 +50,7 @@ export function useCameraPermission() {
 
       // Cache the decision so we never ask again unless the user changes it
       try {
-        await AsyncStorage.setItem(CAMERA_PERMISSION_KEY, status);
+        await setItemAsync(CAMERA_PERMISSION_KEY, status);
       } catch {
         // Ignore storage errors — permission still works, just won't persist
       }
@@ -63,11 +63,24 @@ export function useCameraPermission() {
     }
   }, []);
 
-  // Request permission once when the hook mounts if we haven't decided yet
+  // Request permission once when the mount if we haven't decided yet
   useEffect(() => {
-    if (hasPermission !== null) return; // already decided
+    if (hasPermission !== null) return;
 
-    requestPermission();
+    (async () => {
+      try {
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        const granted = status === 'granted';
+        setHasPermission(granted);
+        try {
+        await setItemAsync(CAMERA_PERMISSION_KEY, status);
+        } catch {
+          // Ignore storage errors
+        }
+      } catch {
+        setHasPermission(false);
+      }
+    })();
   }, [hasPermission, requestPermission]);
 
   return {
