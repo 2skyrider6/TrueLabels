@@ -32,6 +32,12 @@ jest.mock('react-native-reanimated', () =>
   require('react-native-reanimated/mock')
 );
 
+// @expo-google-fonts/inter would try to load real fonts, which fails in Jest.
+// Mock it so useFonts immediately resolves with fonts loaded.
+jest.mock('@expo-google-fonts/inter', () => ({
+  useFonts: () => [true, null],
+}));
+
 import { installFakeCamera, installFakeOcr, resetCamera, resetOcr } from './fakes/camera';
 import {
   installAlertRecorder,

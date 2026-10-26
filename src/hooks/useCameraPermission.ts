@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Camera } from 'expo-camera';
 import { getItemAsync, setItemAsync } from 'expo-secure-store';
 
@@ -16,6 +16,7 @@ const CAMERA_PERMISSION_KEY = 'truelabels_camera_permission';
  */
 export function useCameraPermission() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const hasInitialized = useRef(false);
 
   // Load cached permission decision on mount
   useEffect(() => {
@@ -63,9 +64,9 @@ export function useCameraPermission() {
     }
   }, []);
 
-  // Request permission once when the mount if we haven't decided yet
+  // Request permission once when mount if we haven't decided yet
   useEffect(() => {
-    if (hasPermission !== null) return;
+    if (hasInitialized.current) return;
 
     (async () => {
       try {
@@ -73,7 +74,7 @@ export function useCameraPermission() {
         const granted = status === 'granted';
         setHasPermission(granted);
         try {
-        await setItemAsync(CAMERA_PERMISSION_KEY, status);
+          await setItemAsync(CAMERA_PERMISSION_KEY, status);
         } catch {
           // Ignore storage errors
         }
@@ -81,7 +82,9 @@ export function useCameraPermission() {
         setHasPermission(false);
       }
     })();
-  }, [hasPermission, requestPermission]);
+
+    hasInitialized.current = true;
+  }, [hasPermission]);
 
   return {
     hasPermission,
